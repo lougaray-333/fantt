@@ -21,9 +21,11 @@ function hasLocalData() {
   }
 }
 
+// Set to true to bypass auth and use localStorage (for testing)
+const SKIP_AUTH = true;
+
 export default function App() {
-  // Skip auth entirely when Supabase isn't configured — go straight to editor
-  if (!isConfigured) {
+  if (!isConfigured || SKIP_AUTH) {
     return <GanttEditor projectId={null} onBack={null} />;
   }
 
