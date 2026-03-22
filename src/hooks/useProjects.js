@@ -3,22 +3,23 @@ import { supabase } from '../lib/supabase';
 
 const MAX_PROJECTS = 20;
 
-export function useProjects(userId) {
+export function useProjects(email) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchProjects = useCallback(async () => {
-    if (!userId) return;
+    if (!email) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', userId)
+      .eq('email', email)
       .order('updated_at', { ascending: false });
 
+    if (error) console.error('[useProjects] fetch error:', error);
     if (!error) setProjects(data || []);
     setLoading(false);
-  }, [userId]);
+  }, [email]);
 
   useEffect(() => {
     fetchProjects();
@@ -29,14 +30,14 @@ export function useProjects(userId) {
   const createProject = useCallback(async (name = 'Untitled Project') => {
     const { data, error } = await supabase
       .from('projects')
-      .insert({ user_id: userId, name })
+      .insert({ email, name })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) { console.error('[useProjects] create error:', error); throw error; }
     setProjects((prev) => [data, ...prev]);
     return data;
-  }, [userId]);
+  }, [email]);
 
   const deleteProject = useCallback(async (id) => {
     const { error } = await supabase

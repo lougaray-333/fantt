@@ -1,21 +1,37 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Library, ArrowLeft, Loader2, Trash2, BarChart3 } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, Download } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
+import { useTheme } from '../hooks/useTheme';
 import { formatDate, addDays } from '../utils/dates';
 import GanttChart from './GanttChart';
 import TaskForm from './TaskForm';
-import TaskList from './TaskList';
+import InlineTaskTable from './InlineTaskTable';
 import ViewModeToggle from './ViewModeToggle';
 import Legend from './Legend';
 import ActivityLibrary from './ActivityLibrary';
+import ListView from './ListView';
+import { taskToCSVRow, generateCSV, downloadCSV, generateTemplateCSV } from '../utils/csv';
+import activityDatabase from '../data/activityDatabase';
 
-export default function GanttEditor({ projectId, onBack }) {
+export default function GanttEditor({ projectId, email, onBack, pendingImportTasks, onImportTasksConsumed }) {
   const store = useTaskStore(projectId);
+  const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
+  const [mainView, setMainView] = useState('gantt');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [animatingTask, setAnimatingTask] = useState(null);
+
+  // Consume pending CSV import tasks
+  useEffect(() => {
+    if (pendingImportTasks && !store.loading) {
+      store.importTasks(pendingImportTasks, 'replace');
+      onImportTasksConsumed?.();
+    }
+  }, [pendingImportTasks, store.loading]);
 
   // Derive editingTask from live store data so form updates during drag/resize
   const editingTask = useMemo(
@@ -37,6 +53,7 @@ export default function GanttEditor({ projectId, onBack }) {
     } else {
       setSelectedIds(new Set([id]));
       setEditingId(id);
+      setFormOpen(true);
     }
   }, []);
 
@@ -70,25 +87,14 @@ export default function GanttEditor({ projectId, onBack }) {
     if (editingTask) {
       store.updateTask(editingTask.id, formData);
       setEditingId(null);
+      setFormOpen(false);
     } else {
       const task = store.addTask(formData);
       setSelectedIds(new Set([task.id]));
+      setAnimatingTask({ id: task.id, type: 'pop-in' });
+      setTimeout(() => setAnimatingTask(null), 400);
+      setFormOpen(false);
     }
-  };
-
-  const handleEdit = (task) => {
-    setEditingId(task.id);
-    setSelectedIds(new Set([task.id]));
-  };
-
-  const handleDelete = (id) => {
-    store.deleteTask(id);
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    if (editingId === id) setEditingId(null);
   };
 
   const handleDeleteSelected = () => {
@@ -99,143 +105,225 @@ export default function GanttEditor({ projectId, onBack }) {
     }
     setSelectedIds(new Set());
     setEditingId(null);
+    setFormOpen(false);
   };
 
-  const handleSelectAll = () => {
-    if (selectedIds.size === store.tasks.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(store.tasks.map((t) => t.id)));
-    }
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    setFormOpen(true);
+  };
+
+  const handleCloseForm = () => {
+    setEditingId(null);
+    setFormOpen(false);
+  };
+
+  const handleExportCSV = () => {
+    const rows = store.tasks.map(taskToCSVRow);
+    const csv = generateCSV(rows);
+    downloadCSV(csv, 'fantt-export.csv');
+  };
+
+  const handleExportTemplate = () => {
+    const csv = generateTemplateCSV(activityDatabase);
+    downloadCSV(csv, 'fantt-template.csv');
   };
 
   if (store.loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-bg">
         <Loader2 size={32} className="animate-spin text-accent" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="flex w-80 shrink-0 flex-col border-r border-border bg-sidebar">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+    <div className="flex h-screen flex-col bg-bg">
+      {/* Top bar */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-sidebar shrink-0">
+        <div className="flex items-center gap-4">
+          {/* Back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+            >
+              <ArrowLeft size={14} />
+              Projects
+            </button>
+          )}
+
+          {/* Logo */}
           <div className="flex items-center gap-2">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="rounded-lg p-1 text-text-muted hover:bg-border/50 transition"
-                title="Back to projects"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <FanttLogo size={22} className="text-accent" />
-            <h1 className="text-base font-bold text-text">Fantt Chart</h1>
+            <FanttLogo size={22} />
+            <span className="text-sm font-bold text-text">Fantt</span>
           </div>
+
+          {/* Gantt / List toggle with sliding pill */}
+          <div className="relative flex items-center rounded-lg border border-border bg-bg p-[3px]">
+            {/* Sliding background pill */}
+            <div
+              className="absolute top-[3px] bottom-[3px] rounded-md bg-accent transition-all duration-200 ease-out"
+              style={{
+                width: 'calc(50% - 3px)',
+                left: mainView === 'gantt' ? '3px' : 'calc(50%)',
+              }}
+            />
+            <button
+              onClick={() => setMainView('gantt')}
+              className={`relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-200 ${
+                mainView === 'gantt' ? 'text-white' : 'text-text-muted hover:text-text'
+              }`}
+            >
+              <BarChart2 size={12} />
+              Gantt
+            </button>
+            <button
+              onClick={() => setMainView('list')}
+              className={`relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-200 ${
+                mainView === 'list' ? 'text-white' : 'text-text-muted hover:text-text'
+              }`}
+            >
+              <List size={12} />
+              List
+            </button>
+          </div>
+
+          {/* View mode (only in gantt view) */}
+          {mainView === 'gantt' && (
+            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+          )}
+
+          {/* Legend */}
+          <Legend tasks={store.tasks} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Delete selected */}
+          {selectedIds.size > 1 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition"
+            >
+              <Trash2 size={14} />
+              Delete {selectedIds.size}
+            </button>
+          )}
+
+          {/* Add Task */}
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
+          >
+            <Plus size={14} />
+            Add Task
+          </button>
+
+          {/* Library */}
           <button
             onClick={() => setLibraryOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition"
-            title="Activity Library"
           >
             <Library size={14} />
             Library
           </button>
-        </div>
 
-        {/* Task Form */}
-        <div className="border-b border-border p-4">
-          <TaskForm
-            editingTask={editingTask}
-            tasks={store.tasks}
-            onSubmit={handleAddOrUpdate}
-            onCancel={() => setEditingId(null)}
-          />
-        </div>
+          {/* Export CSV */}
+          {store.tasks.length > 0 && (
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+            >
+              <Download size={14} />
+              Export CSV
+            </button>
+          )}
 
-        {/* Task List */}
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Tasks ({store.tasks.length})
-            </span>
-            <div className="flex items-center gap-1">
-              {selectedIds.size > 0 && (
-                <button
-                  onClick={handleDeleteSelected}
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-red-500 hover:bg-red-50 transition"
-                  title="Delete selected"
-                >
-                  <Trash2 size={12} />
-                  {selectedIds.size}
-                </button>
-              )}
-              {store.tasks.length > 0 && (
-                <button
-                  onClick={handleSelectAll}
-                  className="rounded px-1.5 py-0.5 text-[10px] font-medium text-text-muted hover:bg-bg-alt transition"
-                >
-                  {selectedIds.size === store.tasks.length ? 'Deselect all' : 'Select all'}
-                </button>
-              )}
-            </div>
-          </div>
-          <TaskList
-            tasks={store.tasks}
-            selectedIds={selectedIds}
-            onSelect={handleSelect}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+          {/* Save status */}
+          <span className="text-[11px] text-text-muted/60">
+            {store.saveStatus === 'saving' ? (
+              <span className="flex items-center gap-1">
+                <Loader2 size={10} className="animate-spin" />
+                Saving…
+              </span>
+            ) : store.lastSavedAt ? (
+              <span className="flex items-center gap-1">
+                <Check size={10} />
+                Saved {store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            ) : null}
+          </span>
+
+          {/* Email */}
+          <span className="text-[11px] text-text-muted">{email}</span>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+            title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Fantasy mode'}
+          >
+            {theme === 'fantasy' ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === 'fantasy' ? 'Light' : 'Fantasy'}
+          </button>
         </div>
       </div>
 
-      {/* Chart area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-2">
-          <div className="flex items-center gap-4">
-            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-            <Legend tasks={store.tasks} />
-          </div>
-          {selectedIds.size > 1 && (
-            <button
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-100 transition"
-            >
-              <Trash2 size={14} />
-              Delete {selectedIds.size} selected
-            </button>
-          )}
-        </div>
-
-        {/* Chart */}
-        {store.tasks.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="text-center">
-              <BarChart3 size={48} className="mx-auto text-border" />
-              <h2 className="mt-3 text-lg font-semibold text-text-muted">No tasks yet</h2>
-              <p className="mt-1 text-sm text-text-muted/70">
-                Add tasks in the sidebar or use the
-              </p>
+      {/* Main content */}
+      {store.tasks.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <BarChart3 size={48} className="mx-auto text-border" />
+            <h2 className="mt-3 text-lg font-semibold text-text-muted">No tasks yet</h2>
+            <p className="mt-1 text-sm text-text-muted/70">
+              Add tasks or use the Activity Library to get started
+            </p>
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                onClick={handleOpenAdd}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                <Plus size={15} />
+                Add Task
+              </button>
               <button
                 onClick={() => setLibraryOpen(true)}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted hover:bg-bg-alt"
               >
                 <Library size={15} />
-                Activity Library
+                Library
+              </button>
+              <button
+                onClick={handleExportTemplate}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-muted hover:bg-bg-alt"
+              >
+                <Download size={15} />
+                Export Template
               </button>
             </div>
           </div>
-        ) : (
+        </div>
+      ) : mainView === 'list' ? (
+        <ListView
+          tasks={store.tasks}
+          onTaskUpdate={store.updateTask}
+          onTaskClick={(id) => handleSelect(id, false)}
+        />
+      ) : (
+        <div className="flex flex-1 overflow-auto">
+          <InlineTaskTable
+            tasks={store.tasks}
+            viewMode={viewMode}
+            selectedIds={selectedIds}
+            onSelect={handleSelect}
+          />
           <GanttChart
             tasks={store.tasks}
             viewMode={viewMode}
             selectedId={primarySelectedId}
             selectedIds={selectedIds}
+            animatingTask={animatingTask}
+            onAnimationEnd={() => setAnimatingTask(null)}
             onTaskClick={(id, e) => {
               if (e?.metaKey || e?.ctrlKey || e?.shiftKey) {
                 handleSelect(id, true);
@@ -247,10 +335,62 @@ export default function GanttEditor({ projectId, onBack }) {
             onBeginDrag={store.beginDrag}
             onDragMove={store.dragMove}
             onEndDrag={store.endDrag}
-            onReorder={store.reorderTasks}
+            onResizeEnd={(taskId) => {
+              setAnimatingTask({ id: taskId, type: 'bounce-h' });
+              setTimeout(() => setAnimatingTask(null), 300);
+            }}
+            onMoveEnd={(taskId) => {
+              setAnimatingTask({ id: taskId, type: 'bounce-v' });
+              setTimeout(() => setAnimatingTask(null), 350);
+            }}
+            onReorder={(fromIndex, toIndex) => {
+              store.reorderTasks(fromIndex, toIndex);
+              const task = store.tasks[fromIndex];
+              if (task) {
+                setAnimatingTask({ id: task.id, type: 'slot' });
+                setTimeout(() => setAnimatingTask(null), 220);
+              }
+            }}
           />
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Slide-over TaskForm panel */}
+      {formOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={handleCloseForm}
+            style={{ animation: 'fantt-backdrop-in 0.25s ease-out forwards' }}
+          />
+          {/* Panel */}
+          <div
+            className="fixed right-0 top-0 z-50 flex h-full w-96 flex-col border-l border-border bg-sidebar shadow-xl"
+            style={{ animation: 'fantt-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-bold text-text">
+                {editingTask ? 'Edit Task' : 'New Task'}
+              </h2>
+              <button
+                onClick={handleCloseForm}
+                className="rounded-lg p-1 text-text-muted hover:bg-bg-alt transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <TaskForm
+                editingTask={editingTask}
+                tasks={store.tasks}
+                onSubmit={handleAddOrUpdate}
+                onCancel={handleCloseForm}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Activity Library Modal */}
       <ActivityLibrary

@@ -32,6 +32,7 @@ function rowToTask(row) {
     dependencies: row.dependencies || [],
     color: row.color || '',
     sortOrder: row.sort_order ?? 0,
+    assignees: row.assignees || [],
   };
 }
 
@@ -48,13 +49,15 @@ function taskToRow(task, projectId) {
     dependencies: task.dependencies || [],
     color: task.color || '',
     sort_order: task.sortOrder ?? 0,
+    assignees: task.assignees || [],
   };
 }
 
 function loadLocalTasks() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const tasks = raw ? JSON.parse(raw) : [];
+    return tasks.map((t) => ({ ...t, assignees: t.assignees || [] }));
   } catch {
     return [];
   }
@@ -63,7 +66,27 @@ function loadLocalTasks() {
 export function useTaskStore(projectId) {
   const [tasks, setTasks] = useState(() => isConfigured ? [] : loadLocalTasks());
   const [loading, setLoading] = useState(isConfigured);
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const dragSnapshotRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+  const saveTimeoutRef = useRef(null);
+  const lastAnimatedRef = useRef(0);
+
+  const markSaving = useCallback(() => {
+    const now = Date.now();
+    // Only show spinning animation once every 30 seconds
+    if (now - lastAnimatedRef.current > 30000) {
+      setSaveStatus('saving');
+      lastAnimatedRef.current = now;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    }
+  }, []);
+
+  const markSaved = useCallback(() => {
+    setLastSavedAt(new Date());
+    setSaveStatus('idle');
+  }, []);
 
   // localStorage persistence when Supabase is not configured
   useEffect(() => {
@@ -120,6 +143,7 @@ export function useTaskStore(projectId) {
       dependencies: task.dependencies || [],
       color: task.color || '',
       sortOrder: 0,
+      assignees: task.assignees || [],
     };
 
     setTasks((prev) => {
@@ -150,16 +174,24 @@ export function useTaskStore(projectId) {
       if (updates.dependencies !== undefined) row.dependencies = updates.dependencies;
       if (updates.color !== undefined) row.color = updates.color;
       if (updates.sortOrder !== undefined) row.sort_order = updates.sortOrder;
+      if (updates.assignees !== undefined) row.assignees = updates.assignees;
 
       if (Object.keys(row).length > 0) {
-        supabase
-          .from('tasks')
-          .update(row)
-          .eq('id', id)
-          .then(() => touchProject());
+        markSaving();
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+          supabase
+            .from('tasks')
+            .update(row)
+            .eq('id', id)
+            .then(() => {
+              touchProject();
+              markSaved();
+            });
+        }, 300);
       }
     }
-  }, [touchProject]);
+  }, [touchProject, markSaving, markSaved]);
 
   const beginDrag = useCallback(() => {
     setTasks((current) => {
@@ -301,6 +333,8 @@ export function useTaskStore(projectId) {
   return {
     tasks,
     loading,
+    saveStatus,
+    lastSavedAt,
     project: {},
     addTask,
     updateTask,

@@ -1,12 +1,15 @@
 import { useMemo, useRef, useCallback } from 'react';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 
-const ROW_HEIGHT = 44;
-const BAR_HEIGHT = 28;
+export const ROW_HEIGHT = 44;
+export const BAR_HEIGHT = 28;
 const BAR_Y_OFFSET = (ROW_HEIGHT - BAR_HEIGHT) / 2;
-const HEADER_HEIGHT = 64;
-const COL_WIDTHS = { day: 40, week: 20, month: 6 };
+export const COL_WIDTHS = { day: 40, week: 20, month: 6 };
+
+export function getHeaderHeight(viewMode) {
+  return viewMode === 'day' ? 84 : 64;
+}
 
 export default function GanttChart({
   tasks,
@@ -17,12 +20,18 @@ export default function GanttChart({
   onDragMove,
   onEndDrag,
   onReorder,
+  onResizeEnd,
+  onMoveEnd,
   selectedId,
   selectedIds,
+  animatingTask,
+  onAnimationEnd,
 }) {
   const svgRef = useRef(null);
+  const scrollRef = useRef(null);
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
+  const HEADER_HEIGHT = getHeaderHeight(viewMode);
 
   const { start: rangeStart, end: rangeEnd } = useMemo(() => getDateRange(tasks), [tasks]);
   const totalDays = diffDays(rangeStart, rangeEnd);
@@ -56,6 +65,34 @@ export default function GanttChart({
     }
     return spans;
   }, [viewMode, rangeStart, rangeEnd, colWidth]);
+
+  // Week spans for day view (W1, W2, etc.)
+  const weekSpans = useMemo(() => {
+    if (viewMode !== 'day' || tasks.length === 0) return [];
+    // Week 1 = Monday of earliest task's start week
+    let earliest = tasks[0].start;
+    for (const t of tasks) {
+      if (t.start < earliest) earliest = t.start;
+    }
+    const week1Monday = getMonday(earliest);
+    const spans = [];
+    // Start from either week1Monday or rangeStart, whichever is earlier
+    let monday = getMonday(rangeStart);
+    while (monday < rangeEnd) {
+      const nextMonday = addDays(monday, 7);
+      const spanStart = monday < rangeStart ? rangeStart : monday;
+      const spanEnd = nextMonday > rangeEnd ? rangeEnd : nextMonday;
+      const x = diffDays(rangeStart, spanStart) * colWidth;
+      const width = diffDays(spanStart, spanEnd) * colWidth;
+      // Calculate week number relative to week1Monday
+      const weekNum = Math.round(diffDays(week1Monday, monday) / 7) + 1;
+      if (weekNum >= 1 && width > 0) {
+        spans.push({ x, width, label: `W${weekNum}` });
+      }
+      monday = nextMonday;
+    }
+    return spans;
+  }, [viewMode, tasks, rangeStart, rangeEnd, colWidth]);
 
   // Header labels
   const headerLabels = useMemo(() => {
@@ -111,6 +148,7 @@ export default function GanttChart({
       const origStart = task.start;
       const origEnd = task.end;
       let lastDelta = 0;
+      let didMove = false;
 
       if (type === 'move') onBeginDrag();
 
@@ -119,6 +157,12 @@ export default function GanttChart({
         const daysDelta = Math.round(dx / colWidth);
         if (daysDelta === lastDelta) return;
         lastDelta = daysDelta;
+        didMove = true;
+
+        // Capture scroll position before state update
+        const container = scrollRef.current;
+        const scrollLeft = container?.scrollLeft;
+        const scrollTop = container?.scrollTop;
 
         if (type === 'move') {
           onDragMove(task.id, daysDelta);
@@ -133,6 +177,14 @@ export default function GanttChart({
             onTaskUpdate(task.id, { start: formatDate(newStart) });
           }
         }
+
+        // Restore scroll position after re-render
+        if (container) {
+          requestAnimationFrame(() => {
+            container.scrollLeft = scrollLeft;
+            container.scrollTop = scrollTop;
+          });
+        }
       }
 
       function onUp() {
@@ -140,7 +192,14 @@ export default function GanttChart({
         document.removeEventListener('mouseup', onUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        if (type === 'move') onEndDrag();
+
+        if (type === 'move') {
+          onEndDrag();
+          if (didMove) onMoveEnd?.(task.id);
+        }
+        if (type === 'resize-start' || type === 'resize-end') {
+          onResizeEnd?.(task.id);
+        }
       }
 
       document.body.style.cursor = type === 'move' ? 'grabbing' : 'ew-resize';
@@ -148,7 +207,7 @@ export default function GanttChart({
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    [colWidth, onTaskUpdate, onBeginDrag, onDragMove, onEndDrag]
+    [colWidth, onTaskUpdate, onBeginDrag, onDragMove, onEndDrag, onResizeEnd, onMoveEnd]
   );
 
   // Vertical drag (reorder rows)
@@ -187,7 +246,7 @@ export default function GanttChart({
   );
 
   return (
-    <div className="overflow-auto flex-1 bg-bg">
+    <div ref={scrollRef} className="overflow-auto flex-1 bg-bg">
       <svg
         ref={svgRef}
         width={chartWidth}
@@ -203,7 +262,7 @@ export default function GanttChart({
             refY="3"
             orient="auto"
           >
-            <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="#94a3b8" strokeWidth={1.2} />
+            <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} />
           </marker>
           {tasks.map((task) => {
             const x = dayToX(new Date(task.start));
@@ -236,12 +295,12 @@ export default function GanttChart({
           />
         )}
 
-        {/* Month spans for day view */}
+        {/* Day view: Month row (y=18) */}
         {monthSpans.map((m, i) => (
           <g key={`month-${i}`}>
             <text
               x={m.x + m.width / 2}
-              y={20}
+              y={18}
               textAnchor="middle"
               fontSize={13}
               fontWeight={600}
@@ -251,14 +310,36 @@ export default function GanttChart({
               {m.label}
             </text>
             {i > 0 && (
-              <line x1={m.x} y1={4} x2={m.x} y2={28} stroke="var(--color-border)" strokeWidth={0.5} />
+              <line x1={m.x} y1={4} x2={m.x} y2={26} stroke="var(--color-border)" strokeWidth={0.5} />
             )}
           </g>
         ))}
 
-        {/* Separator between month row and day row in day view */}
+        {/* Separator after month row in day view */}
         {viewMode === 'day' && (
-          <line x1={0} y1={30} x2={chartWidth} y2={30} stroke="var(--color-grid)" strokeWidth={0.5} />
+          <line x1={0} y1={28} x2={chartWidth} y2={28} stroke="var(--color-grid)" strokeWidth={0.5} />
+        )}
+
+        {/* Day view: Week number row (y=38) */}
+        {weekSpans.map((w, i) => (
+          <g key={`week-${i}`}>
+            <text
+              x={w.x + w.width / 2}
+              y={42}
+              textAnchor="middle"
+              fontSize={10}
+              fontWeight={600}
+              fill="var(--color-text-muted)"
+              style={{ fontFamily: 'var(--font-sans)' }}
+            >
+              {w.label}
+            </text>
+          </g>
+        ))}
+
+        {/* Separator after week row in day view */}
+        {viewMode === 'day' && weekSpans.length > 0 && (
+          <line x1={0} y1={48} x2={chartWidth} y2={48} stroke="var(--color-grid)" strokeWidth={0.5} />
         )}
 
         {/* Header labels + vertical grid */}
@@ -277,7 +358,7 @@ export default function GanttChart({
               <>
                 <text
                   x={h.x + h.width / 2}
-                  y={44}
+                  y={60}
                   textAnchor="middle"
                   fontSize={12}
                   fontWeight={h.isToday ? 700 : 500}
@@ -288,7 +369,7 @@ export default function GanttChart({
                 </text>
                 <text
                   x={h.x + h.width / 2}
-                  y={57}
+                  y={74}
                   textAnchor="middle"
                   fontSize={9}
                   fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text-muted)'}
@@ -396,7 +477,7 @@ export default function GanttChart({
                       } L${toX - gap},${toY} L${toX - 2},${toY}`
                 }
                 fill="none"
-                stroke="#94a3b8"
+                stroke="var(--color-text-muted)"
                 strokeWidth={1.5}
                 strokeLinejoin="round"
                 markerEnd="url(#arrowhead)"
@@ -415,9 +496,30 @@ export default function GanttChart({
           const isSelected = selectedId === task.id;
           const progress = task.progress || 0;
           const tooltipText = `${task.name}\n${formatShortDate(task.start)} – ${formatShortDate(task.end)}${task.group ? `\nPhase: ${task.group}` : ''}`;
+          const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);
+
+          // Animation style — need transform-box and transform-origin for SVG
+          let animStyle = {};
+          if (animatingTask?.id === task.id) {
+            const animMap = {
+              'jiggle': 'fantt-jiggle 0.28s ease-out',
+              'settle': 'fantt-settle 0.25s ease-out',
+              'slot':   'fantt-slot 0.22s ease-out',
+              'appear': 'fantt-appear 0.3s ease-out',
+              'bounce-h': 'fantt-bounce-h 0.3s ease-out',
+              'bounce-v': 'fantt-bounce-v 0.35s ease-out',
+              'pop-in':   'fantt-pop-in 0.4s ease-out',
+            };
+            const centerX = x + barWidth / 2;
+            const centerY = y + BAR_HEIGHT / 2;
+            animStyle = {
+              animation: animMap[animatingTask.type] || '',
+              transformOrigin: `${centerX}px ${centerY}px`,
+            };
+          }
 
           return (
-            <g key={`bar-${task.id}`}>
+            <g key={`bar-${task.id}`} style={animStyle} onAnimationEnd={onAnimationEnd}>
               <title>{tooltipText}</title>
               {isSelected && (
                 <rect
@@ -463,6 +565,23 @@ export default function GanttChart({
                 {task.name}
               </text>
 
+              {/* Hours/day display in day view */}
+              {viewMode === 'day' && totalHoursPerDay > 0 && barWidth > 60 && (
+                <text
+                  x={x + barWidth - 8}
+                  y={y + BAR_HEIGHT / 2 + 1}
+                  dominantBaseline="middle"
+                  textAnchor="end"
+                  fontSize={9}
+                  fontWeight={600}
+                  fill="white"
+                  opacity={0.8}
+                  style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}
+                >
+                  {totalHoursPerDay}h/d
+                </text>
+              )}
+
               {/* Drag handle for vertical reorder (left edge dot area) */}
               <rect
                 x={x - 14}
@@ -474,8 +593,8 @@ export default function GanttChart({
                 onMouseDown={(e) => handleRowDragStart(e, i)}
               />
               {/* Grip dots */}
-              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 - 4} r={1.5} fill="#94a3b8" opacity={0.5} style={{ pointerEvents: 'none' }} />
-              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 + 4} r={1.5} fill="#94a3b8" opacity={0.5} style={{ pointerEvents: 'none' }} />
+              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 - 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
+              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 + 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
 
               {/* Move surface */}
               <rect

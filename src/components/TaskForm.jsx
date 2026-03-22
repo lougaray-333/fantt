@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Save } from 'lucide-react';
+import { Plus, Save, X } from 'lucide-react';
 import { formatDate } from '../utils/dates';
 import { PRESET_COLORS } from '../utils/colors';
+
+const PHASES = ['Insight', 'Vision', 'Execute'];
 
 export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
   const emptyForm = {
@@ -12,6 +14,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
     progress: 0,
     dependencies: [],
     color: '',
+    assignees: [],
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -28,6 +31,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
         progress: editingTask.progress || 0,
         dependencies: editingTask.dependencies || [],
         color,
+        assignees: editingTask.assignees || [],
       });
       // If color is custom (not in presets), show it in hex input
       if (color && !PRESET_COLORS.some((p) => p.hex === color)) {
@@ -113,12 +117,16 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
 
       <div>
         <label className="mb-1 block text-xs font-medium text-text-muted">Phase</label>
-        <input
+        <select
           value={form.group}
           onChange={(e) => setForm({ ...form, group: e.target.value })}
-          placeholder="e.g. Insight"
           className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
-        />
+        >
+          <option value="">No Phase</option>
+          {PHASES.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
       </div>
 
       {/* Color picker */}
@@ -182,6 +190,59 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
           onChange={(e) => setForm({ ...form, progress: Number(e.target.value) })}
           className="w-full accent-accent"
         />
+      </div>
+
+      {/* Assignees */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-text-muted">Assignees</label>
+        <div className="space-y-1.5">
+          {form.assignees.map((a, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={a.name}
+                onChange={(e) => {
+                  const next = [...form.assignees];
+                  next[i] = { ...next[i], name: e.target.value };
+                  setForm({ ...form, assignees: next });
+                }}
+                placeholder="Name"
+                className="flex-1 rounded-lg border border-border bg-bg px-2.5 py-1.5 text-sm focus:border-accent focus:outline-none"
+              />
+              <input
+                type="number"
+                min={0.5}
+                max={24}
+                step={0.5}
+                value={a.hoursPerDay}
+                onChange={(e) => {
+                  const next = [...form.assignees];
+                  next[i] = { ...next[i], hoursPerDay: Number(e.target.value) || 0 };
+                  setForm({ ...form, assignees: next });
+                }}
+                className="w-16 rounded-lg border border-border bg-bg px-2 py-1.5 text-sm focus:border-accent focus:outline-none"
+              />
+              <span className="text-[10px] text-text-muted">h/d</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm({ ...form, assignees: form.assignees.filter((_, j) => j !== i) });
+                }}
+                className="rounded p-1 text-text-muted hover:bg-red-500/10 hover:text-red-500 transition"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, assignees: [...form.assignees, { name: '', hoursPerDay: 8 }] })}
+          className="mt-1.5 flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition"
+        >
+          <Plus size={12} />
+          Add assignee
+        </button>
       </div>
 
       {otherTasks.length > 0 && (

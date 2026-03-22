@@ -1,14 +1,14 @@
-// 9 preset colors for task bars
+// 9 preset colors for task bars — Fantasy brand palette
 export const PRESET_COLORS = [
-  { name: 'Blue', hex: '#3b82f6' },
-  { name: 'Emerald', hex: '#10b981' },
-  { name: 'Amber', hex: '#f59e0b' },
-  { name: 'Red', hex: '#ef4444' },
-  { name: 'Violet', hex: '#8b5cf6' },
-  { name: 'Cyan', hex: '#06b6d4' },
-  { name: 'Orange', hex: '#f97316' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'Indigo', hex: '#6366f1' },
+  { name: 'Gold', hex: '#ba9634' },
+  { name: 'Emerald', hex: '#34d399' },
+  { name: 'Bronze', hex: '#cd7f32' },
+  { name: 'Ruby', hex: '#ef4444' },
+  { name: 'Violet', hex: '#a78bfa' },
+  { name: 'Teal', hex: '#2dd4bf' },
+  { name: 'Amber', hex: '#fbbf24' },
+  { name: 'Coral', hex: '#fb7185' },
+  { name: 'Sapphire', hex: '#818cf8' },
 ];
 
 // Fallback: assign color by group if task has no custom color

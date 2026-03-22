@@ -1,133 +1,105 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
-import { isConfigured } from './lib/supabase';
-import { useAuth } from './hooks/useAuth';
-import { useProjects } from './hooks/useProjects';
-import { supabase } from './lib/supabase';
+import { useState, useCallback } from 'react';
 import AuthGate from './components/AuthGate';
-import ProjectDashboard from './components/ProjectDashboard';
 import GanttEditor from './components/GanttEditor';
+import ProjectDashboard from './components/ProjectDashboard';
+import LandingPage from './components/LandingPage';
+import { useProjects } from './hooks/useProjects';
 
-const LOCAL_TASKS_KEY = 'gantt-v2-tasks';
-const LOCAL_PROJECT_KEY = 'gantt-v2-project';
-
-function hasLocalData() {
-  try {
-    const raw = localStorage.getItem(LOCAL_TASKS_KEY);
-    const tasks = raw ? JSON.parse(raw) : [];
-    return tasks.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-// Set to true to bypass auth and use localStorage (for testing)
-const SKIP_AUTH = true;
+const EMAIL_KEY = 'fantt-user-email';
+const STORAGE_KEY = 'gantt-v2-tasks';
 
 export default function App() {
-  if (!isConfigured || SKIP_AUTH) {
-    return <GanttEditor projectId={null} onBack={null} />;
-  }
-
-  return <AuthenticatedApp />;
-}
-
-function AuthenticatedApp() {
-  const { user, loading: authLoading, signInWithEmail, signOut } = useAuth();
-  const {
-    projects,
-    loading: projectsLoading,
-    canCreateMore,
-    maxProjects,
-    createProject,
-    deleteProject,
-    renameProject,
-    refetch,
-  } = useProjects(user?.id);
+  const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
-  const [localDataAvailable, setLocalDataAvailable] = useState(false);
+  const [showLanding, setShowLanding] = useState(() => !localStorage.getItem(EMAIL_KEY));
+  const [pendingImportTasks, setPendingImportTasks] = useState(null);
 
-  useEffect(() => {
-    if (user) {
-      setLocalDataAvailable(hasLocalData());
-    }
-  }, [user]);
+  const projectStore = useProjects(email);
 
-  const handleImportLocal = useCallback(async () => {
+  const handleEnter = (userEmail) => {
+    localStorage.setItem(EMAIL_KEY, userEmail);
+    setEmail(userEmail);
+  };
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(EMAIL_KEY);
+    setEmail('');
+    setActiveProjectId(null);
+    setShowLanding(true);
+  }, []);
+
+  const hasLocalData = (() => {
     try {
-      const raw = localStorage.getItem(LOCAL_TASKS_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const tasks = raw ? JSON.parse(raw) : [];
+      return tasks.length > 0;
+    } catch {
+      return false;
+    }
+  })();
+
+  const handleImportCSVProject = useCallback(async (tasks, projectName) => {
+    try {
+      const project = await projectStore.createProject(projectName || 'Imported CSV');
+      setPendingImportTasks(tasks);
+      setActiveProjectId(project.id);
+    } catch {
+      // stay on dashboard
+    }
+  }, [projectStore]);
+
+  const handleImportLocal = async () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
       const tasks = raw ? JSON.parse(raw) : [];
       if (tasks.length === 0) return;
-
-      const projectRaw = localStorage.getItem(LOCAL_PROJECT_KEY);
-      const projectMeta = projectRaw ? JSON.parse(projectRaw) : {};
-      const projectName = projectMeta.name || 'Imported Project';
-
-      const project = await createProject(projectName);
-
-      const rows = tasks.map((t, i) => ({
-        id: crypto.randomUUID(),
-        project_id: project.id,
-        name: t.name,
-        start_date: t.start,
-        end_date: t.end,
-        group: t.group || '',
-        progress: t.progress || 0,
-        dependencies: [],
-        color: t.color || '',
-        sort_order: i,
-      }));
-
-      await supabase.from('tasks').insert(rows);
-
-      localStorage.removeItem(LOCAL_TASKS_KEY);
-      localStorage.removeItem(LOCAL_PROJECT_KEY);
-      setLocalDataAvailable(false);
-
+      const project = await projectStore.createProject('Imported Project');
       setActiveProjectId(project.id);
-    } catch (err) {
-      console.error('Import failed:', err);
+      // Tasks will be imported inside GanttEditor via the store
+    } catch {
+      // stay on dashboard
     }
-  }, [createProject]);
+  };
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-accent" />
-      </div>
-    );
+  // Landing page for new visitors
+  if (showLanding && !email) {
+    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
   }
 
-  if (!user) {
-    return <AuthGate onSignIn={signInWithEmail} />;
+  // Email gate
+  if (!email) {
+    return <AuthGate onEnter={handleEnter} />;
   }
 
-  if (activeProjectId) {
+  // Project dashboard
+  if (!activeProjectId) {
     return (
-      <GanttEditor
-        projectId={activeProjectId}
-        onBack={() => {
-          setActiveProjectId(null);
-          refetch();
-        }}
+      <ProjectDashboard
+        projects={projectStore.projects}
+        loading={projectStore.loading}
+        canCreateMore={projectStore.canCreateMore}
+        maxProjects={projectStore.maxProjects}
+        onCreate={projectStore.createProject}
+        onOpen={setActiveProjectId}
+        onDelete={projectStore.deleteProject}
+        onRename={projectStore.renameProject}
+        onSignOut={handleLogout}
+        onImportLocal={handleImportLocal}
+        hasLocalData={hasLocalData}
+        userEmail={email}
+        onImportCSVProject={handleImportCSVProject}
       />
     );
   }
 
+  // Gantt editor
   return (
-    <ProjectDashboard
-      projects={projects}
-      loading={projectsLoading}
-      canCreateMore={canCreateMore}
-      maxProjects={maxProjects}
-      onCreate={createProject}
-      onOpen={setActiveProjectId}
-      onDelete={deleteProject}
-      onRename={renameProject}
-      onSignOut={signOut}
-      onImportLocal={handleImportLocal}
-      hasLocalData={localDataAvailable}
-      userEmail={user.email}
+    <GanttEditor
+      projectId={activeProjectId}
+      email={email}
+      onBack={() => setActiveProjectId(null)}
+      pendingImportTasks={pendingImportTasks}
+      onImportTasksConsumed={() => setPendingImportTasks(null)}
     />
   );
 }
