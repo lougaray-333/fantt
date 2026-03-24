@@ -12,8 +12,6 @@ export default function App() {
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem(EMAIL_KEY));
-  const [pendingImportTasks, setPendingImportTasks] = useState(null);
-
   const projectStore = useProjects(email);
 
   const handleEnter = (userEmail) => {
@@ -37,16 +35,6 @@ export default function App() {
       return false;
     }
   })();
-
-  const handleImportCSVProject = useCallback(async (tasks, projectName) => {
-    try {
-      const project = await projectStore.createProject(projectName || 'Imported CSV');
-      setPendingImportTasks(tasks);
-      setActiveProjectId(project.id);
-    } catch {
-      // stay on dashboard
-    }
-  }, [projectStore]);
 
   const handleImportLocal = async () => {
     try {
@@ -87,7 +75,6 @@ export default function App() {
         onImportLocal={handleImportLocal}
         hasLocalData={hasLocalData}
         userEmail={email}
-        onImportCSVProject={handleImportCSVProject}
       />
     );
   }
@@ -98,8 +85,6 @@ export default function App() {
       projectId={activeProjectId}
       email={email}
       onBack={() => setActiveProjectId(null)}
-      pendingImportTasks={pendingImportTasks}
-      onImportTasksConsumed={() => setPendingImportTasks(null)}
     />
   );
 }

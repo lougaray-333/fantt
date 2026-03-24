@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, Download } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -11,10 +11,8 @@ import ViewModeToggle from './ViewModeToggle';
 import Legend from './Legend';
 import ActivityLibrary from './ActivityLibrary';
 import ListView from './ListView';
-import { taskToCSVRow, generateCSV, downloadCSV, generateTemplateCSV } from '../utils/csv';
-import activityDatabase from '../data/activityDatabase';
 
-export default function GanttEditor({ projectId, email, onBack, pendingImportTasks, onImportTasksConsumed }) {
+export default function GanttEditor({ projectId, email, onBack }) {
   const store = useTaskStore(projectId);
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
@@ -24,14 +22,6 @@ export default function GanttEditor({ projectId, email, onBack, pendingImportTas
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [animatingTask, setAnimatingTask] = useState(null);
-
-  // Consume pending CSV import tasks
-  useEffect(() => {
-    if (pendingImportTasks && !store.loading) {
-      store.importTasks(pendingImportTasks, 'replace');
-      onImportTasksConsumed?.();
-    }
-  }, [pendingImportTasks, store.loading]);
 
   // Derive editingTask from live store data so form updates during drag/resize
   const editingTask = useMemo(
@@ -116,17 +106,6 @@ export default function GanttEditor({ projectId, email, onBack, pendingImportTas
   const handleCloseForm = () => {
     setEditingId(null);
     setFormOpen(false);
-  };
-
-  const handleExportCSV = () => {
-    const rows = store.tasks.map(taskToCSVRow);
-    const csv = generateCSV(rows);
-    downloadCSV(csv, 'fantt-export.csv');
-  };
-
-  const handleExportTemplate = () => {
-    const csv = generateTemplateCSV(activityDatabase);
-    downloadCSV(csv, 'fantt-template.csv');
   };
 
   if (store.loading) {
@@ -228,17 +207,6 @@ export default function GanttEditor({ projectId, email, onBack, pendingImportTas
             Library
           </button>
 
-          {/* Export CSV */}
-          {store.tasks.length > 0 && (
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
-            >
-              <Download size={14} />
-              Export CSV
-            </button>
-          )}
-
           {/* Save status */}
           <span className="text-[11px] text-text-muted/60">
             {store.saveStatus === 'saving' ? (
@@ -292,13 +260,6 @@ export default function GanttEditor({ projectId, email, onBack, pendingImportTas
               >
                 <Library size={15} />
                 Library
-              </button>
-              <button
-                onClick={handleExportTemplate}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-muted hover:bg-bg-alt"
-              >
-                <Download size={15} />
-                Export Template
               </button>
             </div>
           </div>

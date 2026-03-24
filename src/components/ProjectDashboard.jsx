@@ -7,10 +7,8 @@ import {
   Loader2,
   Clock,
   Pencil,
-  Upload,
 } from 'lucide-react';
 import FanttLogo from './FanttLogo';
-import CSVImportDialog from './CSVImportDialog';
 
 export default function ProjectDashboard({
   projects,
@@ -25,7 +23,6 @@ export default function ProjectDashboard({
   onImportLocal,
   hasLocalData,
   userEmail,
-  onImportCSVProject,
 }) {
   const [deleting, setDeleting] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -33,7 +30,6 @@ export default function ProjectDashboard({
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
-  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const newInputRef = useRef(null);
   const editInputRef = useRef(null);
 
@@ -168,24 +164,14 @@ export default function ProjectDashboard({
               </button>
             </form>
           ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCsvImportOpen(true)}
-                disabled={!canCreateMore}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-muted hover:bg-bg-alt disabled:opacity-50 transition"
-              >
-                <Upload size={16} />
-                Import CSV
-              </button>
-              <button
-                onClick={() => setNamingNew(true)}
-                disabled={!canCreateMore}
-                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-              >
-                <Plus size={16} />
-                New Project
-              </button>
-            </div>
+            <button
+              onClick={() => setNamingNew(true)}
+              disabled={!canCreateMore}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+            >
+              <Plus size={16} />
+              New Project
+            </button>
           )}
         </div>
 
@@ -276,14 +262,6 @@ export default function ProjectDashboard({
         )}
       </main>
 
-      <CSVImportDialog
-        open={csvImportOpen}
-        onClose={() => setCsvImportOpen(false)}
-        onImport={(tasks, name) => {
-          setCsvImportOpen(false);
-          onImportCSVProject(tasks, name);
-        }}
-      />
     </div>
   );
 }
