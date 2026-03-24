@@ -29,6 +29,7 @@ export default function GanttChart({
 }) {
   const svgRef = useRef(null);
   const scrollRef = useRef(null);
+  const panRef = useRef(null);
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
@@ -245,8 +246,48 @@ export default function GanttChart({
     [tasks.length, onReorder]
   );
 
+  // Background click-and-drag to pan/scroll
+  const handlePanStart = useCallback((e) => {
+    // Only pan on left-click directly on the container or SVG background
+    if (e.button !== 0) return;
+    const container = scrollRef.current;
+    if (!container) return;
+
+    panRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: container.scrollLeft,
+      scrollTop: container.scrollTop,
+      moved: false,
+    };
+
+    function onMove(ev) {
+      const pan = panRef.current;
+      if (!pan) return;
+      const dx = ev.clientX - pan.startX;
+      const dy = ev.clientY - pan.startY;
+      if (!pan.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      pan.moved = true;
+      container.scrollLeft = pan.scrollLeft - dx;
+      container.scrollTop = pan.scrollTop - dy;
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      panRef.current = null;
+    }
+
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
   return (
-    <div ref={scrollRef} className="overflow-auto flex-1 bg-bg">
+    <div ref={scrollRef} className="overflow-auto flex-1 bg-bg" style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
       <svg
         ref={svgRef}
         width={chartWidth}
