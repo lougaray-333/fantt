@@ -12,9 +12,10 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
       className="shrink-0 border-r border-border bg-sidebar"
       style={{
         width: 280,
+        minWidth: 280,
         position: 'sticky',
         left: 0,
-        zIndex: 10,
+        zIndex: 20,
       }}
     >
       {/* Header area — matches chart header height */}
