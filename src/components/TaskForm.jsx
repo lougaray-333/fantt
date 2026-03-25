@@ -6,10 +6,17 @@ import { PRESET_COLORS } from '../utils/colors';
 const PHASES = ['Insight', 'Vision', 'Execute'];
 
 export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDelete }) {
+  // Default start = day after the last task's end date, or today
+  const lastTask = tasks.length > 0 ? tasks[tasks.length - 1] : null;
+  const defaultStart = lastTask
+    ? formatDate(new Date(new Date(lastTask.end + 'T00:00:00').getTime() + 86400000))
+    : formatDate(new Date());
+  const defaultEnd = formatDate(new Date(new Date(defaultStart + 'T00:00:00').getTime() + 7 * 86400000));
+
   const emptyForm = {
     name: '',
-    start: formatDate(new Date()),
-    end: formatDate(new Date(Date.now() + 7 * 86400000)),
+    start: defaultStart,
+    end: defaultEnd,
     group: '',
     progress: 0,
     dependencies: [],

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 
@@ -36,6 +36,7 @@ export default function GanttChart({
   const scrollRef = ganttScrollRef || internalScrollRef;
   const panRef = useRef(null);
   const didDragRef = useRef(false);
+  const [tooltip, setTooltip] = useState(null); // { x, y, task }
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
@@ -314,7 +315,7 @@ export default function GanttChart({
   }, [onHorizontalScroll, scrollRef]);
 
   return (
-    <div ref={scrollRef} className="overflow-auto flex-1 bg-bg" style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
+    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "relative bg-bg" : "relative overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
       <svg
         ref={svgRef}
         width={chartWidth}
@@ -623,8 +624,16 @@ export default function GanttChart({
           }
 
           return (
-            <g key={`bar-${task.id}`} style={animStyle} onAnimationEnd={onAnimationEnd}>
-              <title>{tooltipText}</title>
+            <g
+              key={`bar-${task.id}`}
+              style={animStyle}
+              onAnimationEnd={onAnimationEnd}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.closest('svg').getBoundingClientRect();
+                setTooltip({ x: e.clientX - rect.left, y: y - 8, task, tooltipText });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
               {isSelected && (
                 <rect
                   x={x - 2}
@@ -721,6 +730,26 @@ export default function GanttChart({
           );
         })}
       </svg>
+
+      {/* Custom tooltip */}
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none z-50 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-xl"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <div className="text-xs font-semibold text-text leading-tight">{tooltip.task.name}</div>
+          <div className="text-[10px] text-text-muted leading-tight mt-0.5">
+            {formatShortDate(tooltip.task.start)} – {formatShortDate(tooltip.task.end)}
+          </div>
+          {tooltip.task.group && (
+            <div className="text-[10px] text-text-muted/70 leading-tight">Phase: {tooltip.task.group}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

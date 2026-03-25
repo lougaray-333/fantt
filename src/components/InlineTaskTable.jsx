@@ -19,7 +19,7 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
     >
       {/* Header area — matches chart header height */}
       <div
-        className="flex items-end border-b border-border px-3 pb-2"
+        className="flex items-end border-b border-border px-3 pb-2 sticky top-0 bg-sidebar z-10"
         style={{ height: HEADER_HEIGHT }}
       >
         <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
