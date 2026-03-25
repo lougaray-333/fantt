@@ -315,7 +315,7 @@ export default function GanttChart({
   }, [onHorizontalScroll, scrollRef]);
 
   return (
-    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "relative bg-bg" : "relative overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab', zIndex: 0 }} onMouseDown={handlePanStart}>
+    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "overflow-hidden bg-bg" : "overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
       <svg
         ref={svgRef}
         width={chartWidth}
@@ -629,8 +629,10 @@ export default function GanttChart({
               style={animStyle}
               onAnimationEnd={onAnimationEnd}
               onMouseEnter={(e) => {
-                const rect = e.currentTarget.closest('svg').getBoundingClientRect();
-                setTooltip({ x: e.clientX - rect.left, y: y - 8, task, tooltipText });
+                setTooltip({ x: e.clientX, y: e.clientY, task });
+              }}
+              onMouseMove={(e) => {
+                if (tooltip) setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
               }}
               onMouseLeave={() => setTooltip(null)}
             >
@@ -734,10 +736,10 @@ export default function GanttChart({
       {/* Custom tooltip */}
       {tooltip && (
         <div
-          className="absolute pointer-events-none z-50 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-xl"
+          className="fixed pointer-events-none z-[100] rounded-lg border border-border bg-sidebar px-3 py-2 shadow-xl"
           style={{
             left: tooltip.x,
-            top: tooltip.y,
+            top: tooltip.y - 12,
             transform: 'translate(-50%, -100%)',
           }}
         >
