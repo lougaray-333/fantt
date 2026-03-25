@@ -61,23 +61,29 @@ export default function GanttEditor({ projectId, email, onBack }) {
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
   const resourceScrollRef = useRef(null);
-  const syncingRef = useRef(false);
+  const scrollSourceRef = useRef(null); // 'gantt' | 'resource' | null
+  const scrollTimerRef = useRef(null);
+
+  const clearScrollLock = useCallback(() => {
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => { scrollSourceRef.current = null; }, 60);
+  }, []);
 
   const handleGanttScroll = useCallback((scrollLeft) => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
+    if (scrollSourceRef.current === 'resource') return;
+    scrollSourceRef.current = 'gantt';
     const el = resourceScrollRef.current;
     if (el) el.scrollLeft = scrollLeft;
-    requestAnimationFrame(() => { syncingRef.current = false; });
-  }, []);
+    clearScrollLock();
+  }, [clearScrollLock]);
 
   const handleResourceScroll = useCallback((scrollLeft) => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
+    if (scrollSourceRef.current === 'gantt') return;
+    scrollSourceRef.current = 'resource';
     const el = ganttScrollRef.current;
     if (el) el.scrollLeft = scrollLeft;
-    requestAnimationFrame(() => { syncingRef.current = false; });
-  }, []);
+    clearScrollLock();
+  }, [clearScrollLock]);
 
   const handleHideRole = useCallback((role) => {
     setHiddenRoles((prev) => [...prev, role]);

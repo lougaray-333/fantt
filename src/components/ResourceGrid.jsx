@@ -4,7 +4,7 @@ import { RATE_CARD, getDepartments } from '../data/rateCard';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange } from '../utils/dates';
 import { COL_WIDTHS } from './GanttChart';
 
-const ROLE_COL_WIDTH = 360;
+const ROLE_COL_WIDTH = 280;
 const ROW_H = 28;
 
 export default function ResourceGrid({
@@ -414,36 +414,42 @@ export default function ResourceGrid({
                             >
                               <X size={11} />
                             </button>
-                            {/* Role title */}
-                            <span className="text-[11px] text-text truncate shrink min-w-0 w-[100px]">{entry.role}</span>
-                            {/* Person name */}
-                            <input
-                              type="text"
-                              value={personName}
-                              onChange={(e) => onRoleNameChange(entry.role, e.target.value)}
-                              placeholder="Name…"
-                              className="text-[10px] text-accent bg-transparent border-none outline-none w-[70px] shrink-0 truncate placeholder:text-text-muted/30"
-                            />
-                            {/* Quick-fill buttons — visible on hover */}
-                            <div className="ml-auto flex items-center gap-0.5 shrink-0 opacity-0 group-hover/role:opacity-100 transition-opacity">
-                              {[2, 4, 8].map((h) => (
-                                <button
-                                  key={h}
-                                  onClick={() => onQuickFill(entry.role, activeLevel === h ? 0 : h)}
-                                  className={`rounded px-1 py-0 text-[9px] font-bold leading-tight transition
-                                    ${activeLevel === h
-                                      ? 'bg-accent text-white'
-                                      : 'bg-bg-alt text-text-muted hover:bg-accent/20 hover:text-accent'
-                                    }`}
-                                  title={h === 2 ? 'Oversight (2h/day)' : h === 4 ? 'Half-time (4h/day)' : 'Full-time (8h/day)'}
-                                >
-                                  {h}h
-                                </button>
-                              ))}
+                            {/* Role title + person name */}
+                            <div className="flex-1 min-w-0 flex items-center gap-1 group-hover/role:hidden">
+                              <span className="text-[11px] text-text truncate">{entry.role}</span>
+                              {personName && (
+                                <span className="text-[10px] text-accent truncate shrink-0 max-w-[70px]">· {personName}</span>
+                              )}
+                              <span className="text-[10px] text-text-muted font-mono ml-auto shrink-0">${entry.rate}</span>
                             </div>
-                            <span className="text-[10px] text-text-muted font-mono ml-1 shrink-0 group-hover/role:hidden">
-                              ${entry.rate}
-                            </span>
+                            {/* Hover state: editable name + quick-fill */}
+                            <div className="flex-1 min-w-0 items-center gap-1 hidden group-hover/role:flex">
+                              <span className="text-[10px] text-text truncate shrink-0 max-w-[80px]">{entry.role}</span>
+                              <input
+                                type="text"
+                                value={personName}
+                                onChange={(e) => onRoleNameChange(entry.role, e.target.value)}
+                                placeholder="Name…"
+                                className="text-[10px] text-accent bg-transparent border-none outline-none flex-1 min-w-0 truncate placeholder:text-text-muted/30"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                {[2, 4, 8].map((h) => (
+                                  <button
+                                    key={h}
+                                    onClick={() => onQuickFill(entry.role, activeLevel === h ? 0 : h)}
+                                    className={`rounded px-1 py-0 text-[9px] font-bold leading-tight transition
+                                      ${activeLevel === h
+                                        ? 'bg-accent text-white'
+                                        : 'bg-bg-alt text-text-muted hover:bg-accent/20 hover:text-accent'
+                                      }`}
+                                    title={h === 2 ? 'Oversight (2h/day)' : h === 4 ? 'Half-time (4h/day)' : 'Full-time (8h/day)'}
+                                  >
+                                    {h}h
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
