@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Save, X } from 'lucide-react';
+import { Plus, Save, X, Trash2 } from 'lucide-react';
 import { formatDate } from '../utils/dates';
 import { PRESET_COLORS } from '../utils/colors';
 
 const PHASES = ['Insight', 'Vision', 'Execute'];
 
-export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
+export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDelete }) {
   const emptyForm = {
     name: '',
     start: formatDate(new Date()),
@@ -290,6 +290,16 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel }) {
           </button>
         )}
       </div>
+      {editingTask && onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(editingTask.id)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 mt-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition"
+        >
+          <Trash2 size={14} />
+          Delete Task
+        </button>
+      )}
     </form>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 
@@ -26,10 +26,16 @@ export default function GanttChart({
   selectedIds,
   animatingTask,
   onAnimationEnd,
+  ganttScrollRef,
+  onHorizontalScroll,
+  highlightedDate,
+  onDateClick,
 }) {
   const svgRef = useRef(null);
-  const scrollRef = useRef(null);
+  const internalScrollRef = useRef(null);
+  const scrollRef = ganttScrollRef || internalScrollRef;
   const panRef = useRef(null);
+  const didDragRef = useRef(false);
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
@@ -109,6 +115,7 @@ export default function GanttChart({
           sublabel: DAY_ABBRS[d.getDay()],
           isWeekend: isWeekend(d),
           isToday: formatDate(d) === todayStr,
+          dateStr: formatDate(d),
         });
       }
     } else if (viewMode === 'week') {
@@ -150,6 +157,7 @@ export default function GanttChart({
       const origEnd = task.end;
       let lastDelta = 0;
       let didMove = false;
+      didDragRef.current = false;
 
       if (type === 'move') onBeginDrag();
 
@@ -159,6 +167,7 @@ export default function GanttChart({
         if (daysDelta === lastDelta) return;
         lastDelta = daysDelta;
         didMove = true;
+        didDragRef.current = true;
 
         // Capture scroll position before state update
         const container = scrollRef.current;
@@ -286,6 +295,24 @@ export default function GanttChart({
     document.addEventListener('mouseup', onUp);
   }, []);
 
+  // Fire horizontal scroll callback (rAF-throttled)
+  useEffect(() => {
+    if (!onHorizontalScroll) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    let ticking = false;
+    const handler = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        onHorizontalScroll(el.scrollLeft);
+        ticking = false;
+      });
+    };
+    el.addEventListener('scroll', handler, { passive: true });
+    return () => el.removeEventListener('scroll', handler);
+  }, [onHorizontalScroll, scrollRef]);
+
   return (
     <div ref={scrollRef} className="overflow-auto flex-1 bg-bg" style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
       <svg
@@ -335,6 +362,27 @@ export default function GanttChart({
             rx={2}
           />
         )}
+
+        {/* User-clicked column highlight */}
+        {highlightedDate && viewMode === 'day' && (() => {
+          const hx = dayToX(highlightedDate);
+          if (hx < 0 || hx > chartWidth) return null;
+          return (
+            <rect
+              x={hx}
+              y={0}
+              width={colWidth}
+              height={chartHeight}
+              fill="var(--color-accent)"
+              fillOpacity={0.08}
+              stroke="var(--color-accent)"
+              strokeWidth={2}
+              strokeOpacity={0.4}
+              rx={2}
+              style={{ pointerEvents: 'none' }}
+            />
+          );
+        })()}
 
         {/* Day view: Month row (y=18) */}
         {monthSpans.map((m, i) => (
@@ -418,6 +466,21 @@ export default function GanttChart({
                 >
                   {h.sublabel}
                 </text>
+                {/* Clickable header area for column highlight */}
+                {onDateClick && h.dateStr && (
+                  <rect
+                    x={h.x}
+                    y={48}
+                    width={h.width}
+                    height={HEADER_HEIGHT - 48}
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDateClick(highlightedDate === h.dateStr ? null : h.dateStr);
+                    }}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -646,7 +709,7 @@ export default function GanttChart({
                 fill="transparent"
                 style={{ cursor: 'grab' }}
                 onMouseDown={(e) => handleMouseDown(e, task, 'move')}
-                onClick={(e) => onTaskClick?.(task.id, e)}
+                onClick={(e) => { if (!didDragRef.current) onTaskClick?.(task.id, e); }}
               />
 
               {/* Left resize handle */}

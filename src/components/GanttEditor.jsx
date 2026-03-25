@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
-import { formatDate, addDays } from '../utils/dates';
+import { formatDate, addDays, isWeekend } from '../utils/dates';
 import GanttChart from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
@@ -11,6 +11,7 @@ import ViewModeToggle from './ViewModeToggle';
 import Legend from './Legend';
 import ActivityLibrary from './ActivityLibrary';
 import ListView from './ListView';
+import ResourceGrid from './ResourceGrid';
 
 export default function GanttEditor({ projectId, email, onBack }) {
   const store = useTaskStore(projectId);
@@ -22,6 +23,125 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [animatingTask, setAnimatingTask] = useState(null);
+  // Budget data — auto-saved to localStorage keyed by projectId
+  const budgetKey = `gantt-v2-budget-${projectId || 'local'}`;
+  const [resourceHours, setResourceHours] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(budgetKey + '-hours')) || {}; } catch { return {}; }
+  });
+  const [oopExpenses, setOopExpenses] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(budgetKey + '-oop')) || []; } catch { return []; }
+  });
+  const [hiddenRoles, setHiddenRoles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(budgetKey + '-hidden')) || []; } catch { return []; }
+  });
+  const [roleNames, setRoleNames] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
+  });
+  const [budgetOpen, setBudgetOpen] = useState(true);
+  const [budgetCollapsed, setBudgetCollapsed] = useState(false);
+  const [highlightedDate, setHighlightedDate] = useState(null);
+
+  // Auto-save budget data to localStorage
+  useEffect(() => {
+    localStorage.setItem(budgetKey + '-hours', JSON.stringify(resourceHours));
+  }, [resourceHours, budgetKey]);
+
+  useEffect(() => {
+    localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
+  }, [oopExpenses, budgetKey]);
+
+  useEffect(() => {
+    localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
+  }, [hiddenRoles, budgetKey]);
+
+  useEffect(() => {
+    localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
+  }, [roleNames, budgetKey]);
+
+  // Scroll sync refs
+  const ganttScrollRef = useRef(null);
+  const resourceScrollRef = useRef(null);
+  const syncingRef = useRef(false);
+
+  const handleGanttScroll = useCallback((scrollLeft) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    const el = resourceScrollRef.current;
+    if (el) el.scrollLeft = scrollLeft;
+    requestAnimationFrame(() => { syncingRef.current = false; });
+  }, []);
+
+  const handleResourceScroll = useCallback((scrollLeft) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    const el = ganttScrollRef.current;
+    if (el) el.scrollLeft = scrollLeft;
+    requestAnimationFrame(() => { syncingRef.current = false; });
+  }, []);
+
+  const handleHideRole = useCallback((role) => {
+    setHiddenRoles((prev) => [...prev, role]);
+  }, []);
+
+  const handleShowRole = useCallback((role) => {
+    setHiddenRoles((prev) => prev.filter((r) => r !== role));
+  }, []);
+
+  const handleRoleNameChange = useCallback((role, name) => {
+    setRoleNames((prev) => ({ ...prev, [role]: name }));
+  }, []);
+
+  const handleResourceHoursChange = useCallback((role, dateStr, hours) => {
+    setResourceHours((prev) => ({
+      ...prev,
+      [role]: { ...(prev[role] || {}), [dateStr]: hours },
+    }));
+  }, []);
+
+  // Quick-fill: set hours for every weekday across the project's actual task date range
+  const handleQuickFill = useCallback((role, hoursPerDay) => {
+    if (store.tasks.length === 0) return;
+    let minDate = store.tasks[0].start;
+    let maxDate = store.tasks[0].end;
+    for (const t of store.tasks) {
+      if (t.start < minDate) minDate = t.start;
+      if (t.end > maxDate) maxDate = t.end;
+    }
+    const newRoleData = {};
+    let cursor = new Date(minDate + 'T00:00:00');
+    const end = new Date(maxDate + 'T00:00:00');
+    while (cursor <= end) {
+      const dateStr = formatDate(cursor);
+      newRoleData[dateStr] = isWeekend(cursor) ? 0 : hoursPerDay;
+      cursor = addDays(cursor, 1);
+    }
+    setResourceHours((prev) => ({
+      ...prev,
+      [role]: hoursPerDay === 0 ? {} : newRoleData,
+    }));
+  }, [store.tasks]);
+
+  const handleAddOop = useCallback(() => {
+    setOopExpenses((prev) => [
+      ...prev,
+      { id: `oop-${Date.now()}`, name: '', amount: 0 },
+    ]);
+  }, []);
+
+  const handleRemoveOop = useCallback((oopId) => {
+    setOopExpenses((prev) => prev.filter((o) => o.id !== oopId));
+  }, []);
+
+  const handleOopChange = useCallback((oopId, field, value) => {
+    setOopExpenses((prev) =>
+      prev.map((o) => {
+        if (o.id !== oopId) return o;
+        if (field === 'name') return { ...o, name: value };
+        if (field === 'amount') return { ...o, amount: Number(value) || 0 };
+        return o;
+      })
+    );
+  }, []);
 
   // Derive editingTask from live store data so form updates during drag/resize
   const editingTask = useMemo(
@@ -86,6 +206,18 @@ export default function GanttEditor({ projectId, email, onBack }) {
       setFormOpen(false);
     }
   };
+
+  const handleDeleteTask = useCallback((id) => {
+    const task = store.tasks.find((t) => t.id === id);
+    if (!task || !confirm(`Delete "${task.name}"?`)) return;
+    store.deleteTask(id);
+    selectedIds.delete(id);
+    setSelectedIds(new Set(selectedIds));
+    if (editingId === id) {
+      setEditingId(null);
+      setFormOpen(false);
+    }
+  }, [store, selectedIds, editingId]);
 
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
@@ -175,6 +307,19 @@ export default function GanttEditor({ projectId, email, onBack }) {
 
           {/* Legend */}
           <Legend tasks={store.tasks} />
+
+          {/* Budget toggle */}
+          <button
+            onClick={() => setBudgetOpen((o) => !o)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              budgetOpen
+                ? 'bg-accent/15 text-accent'
+                : 'text-text-muted hover:bg-bg-alt'
+            }`}
+          >
+            <DollarSign size={13} />
+            Budget
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -271,48 +416,79 @@ export default function GanttEditor({ projectId, email, onBack }) {
           onTaskClick={(id) => handleSelect(id, false)}
         />
       ) : (
-        <div className="flex flex-1 overflow-auto">
-          <InlineTaskTable
-            tasks={store.tasks}
-            viewMode={viewMode}
-            selectedIds={selectedIds}
-            onSelect={handleSelect}
-          />
-          <GanttChart
-            tasks={store.tasks}
-            viewMode={viewMode}
-            selectedId={primarySelectedId}
-            selectedIds={selectedIds}
-            animatingTask={animatingTask}
-            onAnimationEnd={() => setAnimatingTask(null)}
-            onTaskClick={(id, e) => {
-              if (e?.metaKey || e?.ctrlKey || e?.shiftKey) {
-                handleSelect(id, true);
-              } else {
-                handleSelect(id, false);
-              }
-            }}
-            onTaskUpdate={store.updateTask}
-            onBeginDrag={store.beginDrag}
-            onDragMove={store.dragMove}
-            onEndDrag={store.endDrag}
-            onResizeEnd={(taskId) => {
-              setAnimatingTask({ id: taskId, type: 'bounce-h' });
-              setTimeout(() => setAnimatingTask(null), 300);
-            }}
-            onMoveEnd={(taskId) => {
-              setAnimatingTask({ id: taskId, type: 'bounce-v' });
-              setTimeout(() => setAnimatingTask(null), 350);
-            }}
-            onReorder={(fromIndex, toIndex) => {
-              store.reorderTasks(fromIndex, toIndex);
-              const task = store.tasks[fromIndex];
-              if (task) {
-                setAnimatingTask({ id: task.id, type: 'slot' });
-                setTimeout(() => setAnimatingTask(null), 220);
-              }
-            }}
-          />
+        <div className="flex flex-1 flex-col min-h-0">
+          <div className="flex flex-1 overflow-auto min-h-0">
+            <InlineTaskTable
+              tasks={store.tasks}
+              viewMode={viewMode}
+              selectedIds={selectedIds}
+              onSelect={handleSelect}
+              onDelete={handleDeleteTask}
+            />
+            <GanttChart
+              tasks={store.tasks}
+              viewMode={viewMode}
+              selectedId={primarySelectedId}
+              selectedIds={selectedIds}
+              animatingTask={animatingTask}
+              onAnimationEnd={() => setAnimatingTask(null)}
+              ganttScrollRef={ganttScrollRef}
+              onHorizontalScroll={handleGanttScroll}
+              highlightedDate={highlightedDate}
+              onDateClick={setHighlightedDate}
+              onTaskClick={(id, e) => {
+                if (e?.metaKey || e?.ctrlKey || e?.shiftKey) {
+                  handleSelect(id, true);
+                } else {
+                  handleSelect(id, false);
+                }
+              }}
+              onTaskUpdate={store.updateTask}
+              onBeginDrag={store.beginDrag}
+              onDragMove={store.dragMove}
+              onEndDrag={store.endDrag}
+              onResizeEnd={(taskId) => {
+                setAnimatingTask({ id: taskId, type: 'bounce-h' });
+                setTimeout(() => setAnimatingTask(null), 300);
+              }}
+              onMoveEnd={(taskId) => {
+                setAnimatingTask({ id: taskId, type: 'bounce-v' });
+                setTimeout(() => setAnimatingTask(null), 350);
+              }}
+              onReorder={(fromIndex, toIndex) => {
+                store.reorderTasks(fromIndex, toIndex);
+                const task = store.tasks[fromIndex];
+                if (task) {
+                  setAnimatingTask({ id: task.id, type: 'slot' });
+                  setTimeout(() => setAnimatingTask(null), 220);
+                }
+              }}
+            />
+          </div>
+          {budgetOpen && (
+            <ResourceGrid
+              tasks={store.tasks}
+              viewMode={viewMode}
+              resourceHours={resourceHours}
+              onHoursChange={handleResourceHoursChange}
+              onQuickFill={handleQuickFill}
+              hiddenRoles={hiddenRoles}
+              onHideRole={handleHideRole}
+              onShowRole={handleShowRole}
+              roleNames={roleNames}
+              onRoleNameChange={handleRoleNameChange}
+              oopExpenses={oopExpenses}
+              onOopChange={handleOopChange}
+              onAddOop={handleAddOop}
+              onRemoveOop={handleRemoveOop}
+              collapsed={budgetCollapsed}
+              onToggle={() => setBudgetCollapsed((c) => !c)}
+              resourceScrollRef={resourceScrollRef}
+              onHorizontalScroll={handleResourceScroll}
+              highlightedDate={highlightedDate}
+              onDateClick={setHighlightedDate}
+            />
+          )}
         </div>
       )}
 
@@ -347,6 +523,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
                 tasks={store.tasks}
                 onSubmit={handleAddOrUpdate}
                 onCancel={handleCloseForm}
+                onDelete={handleDeleteTask}
               />
             </div>
           </div>

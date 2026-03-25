@@ -1,8 +1,9 @@
+import { Trash2 } from 'lucide-react';
 import { formatShortDate } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 import { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
 
-export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect }) {
+export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onDelete }) {
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
 
@@ -35,7 +36,7 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
             <div
               key={task.id}
               onClick={() => onSelect(task.id, false)}
-              className={`flex items-center gap-2 px-3 cursor-pointer transition border-b border-border/50 ${
+              className={`group/row flex items-center gap-2 px-3 cursor-pointer transition border-b border-border/50 ${
                 isSelected
                   ? 'bg-accent-light'
                   : 'hover:bg-bg-alt'
@@ -63,6 +64,16 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
                   </div>
                 )}
               </div>
+              {/* Delete on hover */}
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                  className="shrink-0 opacity-0 group-hover/row:opacity-100 rounded p-0.5 text-text-muted/50 hover:text-red-500 hover:bg-red-500/10 transition"
+                  title="Delete task"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
           );
         })}
