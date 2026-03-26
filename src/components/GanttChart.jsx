@@ -315,7 +315,7 @@ export default function GanttChart({
   }, [onHorizontalScroll, scrollRef]);
 
   return (
-    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "overflow-hidden bg-bg" : "overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
+    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "overflow-hidden bg-bg shrink-0" : "overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
       <svg
         ref={svgRef}
         width={chartWidth}
