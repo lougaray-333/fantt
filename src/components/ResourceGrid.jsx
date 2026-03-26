@@ -545,7 +545,7 @@ export default function ResourceGrid({
             {/* Scrollable day columns */}
             <div
               ref={resourceScrollRef}
-              className="flex-1 overflow-auto"
+              className="flex-1 overflow-auto bg-sidebar"
               style={{ maxHeight: 300 }}
             >
               <div style={{ width: gridWidth, minWidth: '100%' }}>
