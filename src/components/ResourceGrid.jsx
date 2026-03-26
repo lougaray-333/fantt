@@ -223,7 +223,7 @@ export default function ResourceGrid({
     highlightedDate === dateStr ? 'ring-2 ring-inset ring-accent/40 bg-accent/10' : '';
 
   return (
-    <div className="shrink-0 border-t border-border bg-sidebar flex flex-col">
+    <div className="shrink-0 border-t border-border bg-sidebar flex flex-col relative z-10">
       {/* Collapse bar */}
       <div className="flex w-full items-center gap-2 px-4 py-2 shrink-0 relative">
         <button
@@ -362,9 +362,9 @@ export default function ResourceGrid({
       </div>
 
       {!collapsed && (
-        <div className="border-t border-border flex flex-col">
+        <div className="border-t border-border flex flex-col bg-sidebar">
           {/* Scrollable body (role column + day grid) */}
-          <div className="flex" style={{ maxHeight: 300 }}>
+          <div className="flex overflow-hidden" style={{ maxHeight: 300 }}>
             {/* Sticky role column */}
             <div
               className="shrink-0 overflow-hidden border-r border-border bg-sidebar z-10"
