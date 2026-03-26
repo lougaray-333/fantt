@@ -364,7 +364,7 @@ export default function ResourceGrid({
       {!collapsed && (
         <div className="border-t border-border flex flex-col bg-sidebar">
           {/* Scrollable body (role column + day grid) */}
-          <div className="flex overflow-hidden" style={{ maxHeight: 300 }}>
+          <div className="flex" style={{ maxHeight: 300 }}>
             {/* Sticky role column */}
             <div
               className="shrink-0 overflow-hidden border-r border-border bg-sidebar z-10"

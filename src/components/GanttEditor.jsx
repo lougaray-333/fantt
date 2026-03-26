@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign, Zap } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -172,6 +172,57 @@ export default function GanttEditor({ projectId, email, onBack }) {
       setFormOpen(true);
     }
   }, []);
+
+  const handleLoadPreset = () => {
+    const PRESET = [
+      { name: 'Project Kickoff & Alignment', phase: 'Insight', days: 2 },
+      { name: 'Stakeholder Interviews', phase: 'Insight', days: 5 },
+      { name: 'Competitive & Market Audit', phase: 'Insight', days: 5 },
+      { name: 'Insights Synthesis', phase: 'Insight', days: 3 },
+      { name: 'Insight Readout & Approval', phase: 'Insight', days: 1 },
+      { name: 'UX Strategy & Concepting', phase: 'Vision', days: 5 },
+      { name: 'Wireframes & User Flows', phase: 'Vision', days: 7 },
+      { name: 'Visual Design Direction', phase: 'Vision', days: 5 },
+      { name: 'Design Review & Refinement', phase: 'Vision', days: 3 },
+      { name: 'Vision Readout & Approval', phase: 'Vision', days: 1 },
+      { name: 'Design System & Components', phase: 'Execute', days: 7 },
+      { name: 'Frontend Development', phase: 'Execute', days: 10 },
+      { name: 'Content Integration', phase: 'Execute', days: 5 },
+      { name: 'QA & UAT', phase: 'Execute', days: 5 },
+      { name: 'Launch & Handoff', phase: 'Execute', days: 2 },
+    ];
+
+    let cursor = new Date();
+    // Skip to next Monday
+    while (cursor.getDay() !== 1) cursor = addDays(cursor, 1);
+
+    let prevId = null;
+    for (const item of PRESET) {
+      // Skip weekends for start
+      let start = new Date(cursor);
+      while (isWeekend(start)) start = addDays(start, 1);
+
+      // Calculate end skipping weekends
+      let end = new Date(start);
+      let remaining = item.days - 1;
+      while (remaining > 0) {
+        end = addDays(end, 1);
+        if (!isWeekend(end)) remaining--;
+      }
+
+      const task = store.addTask({
+        name: item.name,
+        start: formatDate(start),
+        end: formatDate(end),
+        group: item.phase,
+        progress: 0,
+        dependencies: prevId ? [prevId] : [],
+      });
+
+      prevId = task.id;
+      cursor = addDays(end, 1);
+    }
+  };
 
   const handleAddFromLibrary = (activities) => {
     let cursor = new Date();
@@ -399,8 +450,15 @@ export default function GanttEditor({ projectId, email, onBack }) {
             </p>
             <div className="mt-3 flex items-center justify-center gap-2">
               <button
-                onClick={handleOpenAdd}
+                onClick={handleLoadPreset}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                <Zap size={15} />
+                Sample Project
+              </button>
+              <button
+                onClick={handleOpenAdd}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-muted hover:bg-bg-alt"
               >
                 <Plus size={15} />
                 Add Task
@@ -423,7 +481,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
         />
       ) : (
         <div className="flex flex-1 flex-col min-h-0">
-          <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0">
+          <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0 isolate">
             <InlineTaskTable
               tasks={store.tasks}
               viewMode={viewMode}
