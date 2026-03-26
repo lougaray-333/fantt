@@ -451,6 +451,15 @@ export default memo(function ResourceGrid({
                                       {h}h
                                     </button>
                                   ))}
+                                  {activeLevel > 0 && (
+                                    <button
+                                      onClick={() => onQuickFill(entry.role, 0)}
+                                      className="rounded p-0 text-text-muted hover:text-red-400 transition ml-0.5"
+                                      title="Clear hours"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>

@@ -102,24 +102,26 @@ export default function GanttEditor({ projectId, email, onBack }) {
   // Quick-fill: set hours for every weekday across the project's actual task date range
   const handleQuickFill = useCallback((role, hoursPerDay) => {
     if (store.tasks.length === 0) return;
-    let minDate = store.tasks[0].start;
-    let maxDate = store.tasks[0].end;
+    if (hoursPerDay === 0) {
+      setResourceHours((prev) => ({ ...prev, [role]: {} }));
+      return;
+    }
+    let min = new Date(store.tasks[0].start + 'T00:00:00');
+    let max = new Date(store.tasks[0].end + 'T00:00:00');
     for (const t of store.tasks) {
-      if (t.start < minDate) minDate = t.start;
-      if (t.end > maxDate) maxDate = t.end;
+      const s = new Date(t.start + 'T00:00:00');
+      const e = new Date(t.end + 'T00:00:00');
+      if (s < min) min = s;
+      if (e > max) max = e;
     }
     const newRoleData = {};
-    let cursor = new Date(minDate + 'T00:00:00');
-    const end = new Date(maxDate + 'T00:00:00');
-    while (cursor <= end) {
+    let cursor = new Date(min);
+    while (cursor <= max) {
       const dateStr = formatDate(cursor);
       newRoleData[dateStr] = isWeekend(cursor) ? 0 : hoursPerDay;
       cursor = addDays(cursor, 1);
     }
-    setResourceHours((prev) => ({
-      ...prev,
-      [role]: hoursPerDay === 0 ? {} : newRoleData,
-    }));
+    setResourceHours((prev) => ({ ...prev, [role]: newRoleData }));
   }, [store.tasks]);
 
   const handleAddOop = useCallback(() => {
