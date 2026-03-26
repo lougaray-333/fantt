@@ -7,6 +7,23 @@ import { COL_WIDTHS } from './GanttChart';
 const ROLE_COL_WIDTH = 280;
 const ROW_H = 28;
 
+// Input that manages local state and only propagates on blur
+function LocalInput({ value, onChange, ...props }) {
+  const [local, setLocal] = useState(value);
+  const ref = useRef(null);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <input
+      ref={ref}
+      {...props}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => onChange(local)}
+      onKeyDown={(e) => { if (e.key === 'Enter') ref.current?.blur(); }}
+    />
+  );
+}
+
 export default memo(function ResourceGrid({
   tasks,
   viewMode,
@@ -411,10 +428,10 @@ export default memo(function ResourceGrid({
                               </div>
                               <div className="flex-1 min-w-0 items-center gap-1 hidden group-hover/role:flex">
                                 <span className="text-[10px] text-text truncate shrink-0 max-w-[80px]">{entry.role}</span>
-                                <input
+                                <LocalInput
                                   type="text"
                                   value={personName}
-                                  onChange={(e) => onRoleNameChange(entry.role, e.target.value)}
+                                  onChange={(val) => onRoleNameChange(entry.role, val)}
                                   placeholder="Name…"
                                   className="text-[10px] text-accent bg-transparent border-none outline-none flex-1 min-w-0 truncate placeholder:text-text-muted/30"
                                   onClick={(e) => e.stopPropagation()}
@@ -543,20 +560,20 @@ export default memo(function ResourceGrid({
                       >
                         <X size={11} />
                       </button>
-                      <input
+                      <LocalInput
                         type="text"
                         value={oop.name}
-                        onChange={(e) => onOopChange(oop.id, 'name', e.target.value)}
+                        onChange={(val) => onOopChange(oop.id, 'name', val)}
                         placeholder="Description…"
                         className="text-[11px] text-text bg-transparent border-none outline-none flex-1 min-w-0 truncate"
                       />
                       <div className="shrink-0 flex items-center gap-0.5">
                         <span className="text-[10px] text-text-muted">$</span>
-                        <input
+                        <LocalInput
                           type="number"
                           min="0"
                           value={oop.amount || ''}
-                          onChange={(e) => onOopChange(oop.id, 'amount', e.target.value)}
+                          onChange={(val) => onOopChange(oop.id, 'amount', val)}
                           placeholder="0"
                           className="w-[60px] text-[10px] font-mono text-text bg-transparent border-none outline-none text-right
                             [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
