@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useRef, useState } from 'react';
+import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { RATE_CARD, getDepartments } from '../data/rateCard';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange } from '../utils/dates';
@@ -7,7 +7,7 @@ import { COL_WIDTHS } from './GanttChart';
 const ROLE_COL_WIDTH = 280;
 const ROW_H = 28;
 
-export default function ResourceGrid({
+export default memo(function ResourceGrid({
   tasks,
   viewMode,
   resourceHours,
@@ -630,4 +630,4 @@ export default function ResourceGrid({
       )}
     </div>
   );
-}
+});

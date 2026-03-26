@@ -41,22 +41,17 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
   const [highlightedDate, setHighlightedDate] = useState(null);
 
-  // Auto-save budget data to localStorage
+  // Auto-save budget data to localStorage (debounced to avoid blocking UI)
+  const saveBudgetRef = useRef(null);
   useEffect(() => {
-    localStorage.setItem(budgetKey + '-hours', JSON.stringify(resourceHours));
-  }, [resourceHours, budgetKey]);
-
-  useEffect(() => {
-    localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
-  }, [oopExpenses, budgetKey]);
-
-  useEffect(() => {
-    localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
-  }, [hiddenRoles, budgetKey]);
-
-  useEffect(() => {
-    localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
-  }, [roleNames, budgetKey]);
+    clearTimeout(saveBudgetRef.current);
+    saveBudgetRef.current = setTimeout(() => {
+      localStorage.setItem(budgetKey + '-hours', JSON.stringify(resourceHours));
+      localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
+      localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
+      localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
+    }, 500);
+  }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey]);
 
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
