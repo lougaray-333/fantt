@@ -481,7 +481,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
         />
       ) : (
         <div className="flex flex-1 flex-col min-h-0">
-          <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0">
+          <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0 items-start">
             <InlineTaskTable
               tasks={store.tasks}
               viewMode={viewMode}
