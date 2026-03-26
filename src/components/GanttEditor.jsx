@@ -480,7 +480,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
           onTaskClick={(id) => handleSelect(id, false)}
         />
       ) : (
-        <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+        <div className="flex flex-1 flex-col min-h-0">
           <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0">
             <InlineTaskTable
               tasks={store.tasks}

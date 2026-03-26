@@ -53,12 +53,11 @@ export default function ResourceGrid({
     return arr;
   }, [rangeStart, totalDays]);
 
-  // Compute totals: hours per day, cost per day, grand total
+  // Compute totals
   const totals = useMemo(() => {
     let grandTotal = 0;
     const hoursPerDay = {};
     const costPerDay = {};
-
     for (const entry of RATE_CARD) {
       if (hiddenSet.has(entry.role)) continue;
       const roleData = resourceHours[entry.role] || {};
@@ -71,14 +70,9 @@ export default function ResourceGrid({
         }
       }
     }
-
-    // Add OOP costs (flat amounts)
     for (const oop of (oopExpenses || [])) {
-      if ((oop.amount || 0) > 0) {
-        grandTotal += oop.amount;
-      }
+      if ((oop.amount || 0) > 0) grandTotal += oop.amount;
     }
-
     return { hoursPerDay, costPerDay, grandTotal };
   }, [resourceHours, oopExpenses, hiddenSet]);
 
@@ -95,16 +89,13 @@ export default function ResourceGrid({
       for (const hours of Object.values(roleData)) {
         if (hours > 0) deptCost += hours * entry.rate;
       }
-      if (deptCost > 0) {
-        map[entry.department] = (map[entry.department] || 0) + deptCost;
-      }
+      if (deptCost > 0) map[entry.department] = (map[entry.department] || 0) + deptCost;
     }
     return map;
   }, [resourceHours, hiddenSet]);
 
-  // Cost by phase — attribute each day's cost to the phase(s) active on that day
+  // Cost by phase
   const costByPhase = useMemo(() => {
-    // Build a map: dateStr → phase (from tasks)
     const datePhaseMap = {};
     for (const task of tasks) {
       if (!task.group) continue;
@@ -113,12 +104,10 @@ export default function ResourceGrid({
       let cursor = start;
       while (cursor <= end) {
         const ds = formatDate(cursor);
-        // First phase wins for a given day (avoids double-counting)
         if (!datePhaseMap[ds]) datePhaseMap[ds] = task.group;
         cursor = addDays(cursor, 1);
       }
     }
-
     const map = {};
     for (const entry of RATE_CARD) {
       if (hiddenSet.has(entry.role)) continue;
@@ -130,26 +119,21 @@ export default function ResourceGrid({
         }
       }
     }
-    // OOP are flat amounts, not attributed to phases
     return map;
   }, [resourceHours, oopExpenses, tasks, hiddenSet]);
 
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const breakdownRef = useRef(null);
 
-  // Close breakdown on outside click
   useEffect(() => {
     if (!breakdownOpen) return;
     const handler = (e) => {
-      if (breakdownRef.current && !breakdownRef.current.contains(e.target)) {
-        setBreakdownOpen(false);
-      }
+      if (breakdownRef.current && !breakdownRef.current.contains(e.target)) setBreakdownOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [breakdownOpen]);
 
-  // Close add-role popover on outside click
   useEffect(() => {
     if (!addRoleOpen) return;
     const handler = (e) => {
@@ -159,7 +143,7 @@ export default function ResourceGrid({
     return () => document.removeEventListener('mousedown', handler);
   }, [addRoleOpen]);
 
-  // Scroll sync
+  // Scroll sync — fires horizontal scroll to parent
   useEffect(() => {
     if (!onHorizontalScroll) return;
     const el = resourceScrollRef?.current;
@@ -177,18 +161,7 @@ export default function ResourceGrid({
     return () => el.removeEventListener('scroll', handler);
   }, [onHorizontalScroll, resourceScrollRef]);
 
-  // Sync vertical scroll between role column and grid
-  const roleColRef = useRef(null);
-  useEffect(() => {
-    const grid = resourceScrollRef?.current;
-    const roleCol = roleColRef.current;
-    if (!grid || !roleCol) return;
-    const handler = () => { roleCol.scrollTop = grid.scrollTop; };
-    grid.addEventListener('scroll', handler, { passive: true });
-    return () => grid.removeEventListener('scroll', handler);
-  }, [resourceScrollRef]);
-
-  // Also sync the frozen bottom rows horizontally
+  // Sync frozen bottom rows horizontally with main grid
   const bottomScrollRef = useRef(null);
   useEffect(() => {
     const grid = resourceScrollRef?.current;
@@ -206,21 +179,43 @@ export default function ResourceGrid({
     [onHoursChange]
   );
 
-  // Detect active quick-fill level for a role (check if all weekday values match a preset)
   const getActiveLevel = useCallback((role) => {
     const roleData = resourceHours[role] || {};
     const values = Object.values(roleData).filter((v) => v > 0);
     if (values.length === 0) return 0;
     const first = values[0];
     if ([2, 4, 8].includes(first) && values.every((v) => v === first)) return first;
-    return null; // mixed / custom
+    return null;
   }, [resourceHours]);
 
   const gridWidth = totalDays * colWidth;
+  const totalWidth = ROLE_COL_WIDTH + gridWidth;
 
-  // Helper for column highlight class
   const colHighlight = (dateStr) =>
     highlightedDate === dateStr ? 'ring-2 ring-inset ring-accent/40 bg-accent/10' : '';
+
+  // Sticky cell style for role column
+  const stickyLeft = 'sticky left-0 z-10';
+
+  // Render a role cell (used in each row)
+  const RoleCell = ({ children, className = '' }) => (
+    <div
+      className={`${stickyLeft} shrink-0 border-r border-border bg-sidebar ${className}`}
+      style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
+    >
+      {children}
+    </div>
+  );
+
+  // Render a dept header role cell
+  const DeptCell = ({ children }) => (
+    <div
+      className={`${stickyLeft} shrink-0 border-r border-border bg-bg-alt/60`}
+      style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
+    >
+      {children}
+    </div>
+  );
 
   return (
     <div className="shrink-0 border-t border-border bg-sidebar flex flex-col relative z-10">
@@ -246,7 +241,7 @@ export default function ResourceGrid({
             {formatCurrency(totals.grandTotal)}
           </button>
 
-          {/* Breakdown popover — uses fixed positioning to escape overflow */}
+          {/* Breakdown popover */}
           {breakdownOpen && (
             <div
               className="fixed right-4 w-[420px] rounded-xl border border-border bg-sidebar shadow-2xl z-[100] overflow-hidden"
@@ -267,67 +262,45 @@ export default function ResourceGrid({
                 </div>
               </div>
               <div className="flex divide-x divide-border">
-                {/* By Department */}
                 <div className="flex-1 px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                    By Department
-                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">By Department</div>
                   {Object.keys(costByDept).length === 0 ? (
                     <div className="text-[11px] text-text-muted/50">No hours allocated</div>
                   ) : (
                     <div className="space-y-1.5">
-                      {Object.entries(costByDept)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([dept, cost]) => (
-                          <div key={dept} className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-text truncate">{dept}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="w-16 h-1.5 rounded-full bg-border overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-accent"
-                                  style={{ width: `${Math.min(100, (cost / totals.grandTotal) * 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-mono font-semibold text-text w-14 text-right">
-                                {formatCurrency(cost)}
-                              </span>
+                      {Object.entries(costByDept).sort((a, b) => b[1] - a[1]).map(([dept, cost]) => (
+                        <div key={dept} className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-text truncate">{dept}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-16 h-1.5 rounded-full bg-border overflow-hidden">
+                              <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (cost / totals.grandTotal) * 100)}%` }} />
                             </div>
+                            <span className="text-[10px] font-mono font-semibold text-text w-14 text-right">{formatCurrency(cost)}</span>
                           </div>
-                        ))}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-
-                {/* By Phase */}
                 <div className="flex-1 px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                    By Phase
-                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">By Phase</div>
                   {Object.keys(costByPhase).length === 0 ? (
                     <div className="text-[11px] text-text-muted/50">No phases assigned</div>
                   ) : (
                     <div className="space-y-1.5">
-                      {Object.entries(costByPhase)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([phase, cost]) => (
-                          <div key={phase} className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-text truncate">{phase}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="w-16 h-1.5 rounded-full bg-border overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-accent"
-                                  style={{ width: `${Math.min(100, (cost / totals.grandTotal) * 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-mono font-semibold text-text w-14 text-right">
-                                {formatCurrency(cost)}
-                              </span>
+                      {Object.entries(costByPhase).sort((a, b) => b[1] - a[1]).map(([phase, cost]) => (
+                        <div key={phase} className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-text truncate">{phase}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-16 h-1.5 rounded-full bg-border overflow-hidden">
+                              <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, (cost / totals.grandTotal) * 100)}%` }} />
                             </div>
+                            <span className="text-[10px] font-mono font-semibold text-text w-14 text-right">{formatCurrency(cost)}</span>
                           </div>
-                        ))}
+                        </div>
+                      ))}
                     </div>
                   )}
-                  {/* Unphased cost */}
                   {(() => {
                     const phasedTotal = Object.values(costByPhase).reduce((s, c) => s + c, 0);
                     const oopTotal = (oopExpenses || []).reduce((s, o) => s + (o.amount || 0), 0);
@@ -336,16 +309,12 @@ export default function ResourceGrid({
                     return (
                       <div className="flex items-center justify-between gap-2 mt-0.5 opacity-60">
                         <span className="text-[11px] text-text-muted italic truncate">Unphased</span>
-                        <span className="text-[10px] font-mono font-semibold text-text-muted w-14 text-right">
-                          {formatCurrency(unphasedResource)}
-                        </span>
+                        <span className="text-[10px] font-mono font-semibold text-text-muted w-14 text-right">{formatCurrency(unphasedResource)}</span>
                       </div>
                     );
                   })()}
                 </div>
               </div>
-
-              {/* OOP total if any */}
               {(oopExpenses || []).length > 0 && (() => {
                 const oopTotal = (oopExpenses || []).reduce((s, o) => s + (o.amount || 0), 0);
                 if (oopTotal <= 0) return null;
@@ -363,106 +332,153 @@ export default function ResourceGrid({
 
       {!collapsed && (
         <div className="border-t border-border flex flex-col bg-sidebar">
-          {/* Scrollable body (role column + day grid) */}
-          <div className="flex" style={{ maxHeight: 300 }}>
-            {/* Sticky role column */}
-            <div
-              className="shrink-0 overflow-hidden border-r border-border bg-sidebar z-10"
-              style={{ width: ROLE_COL_WIDTH }}
-            >
-              {/* Header */}
-              <div
-                className="flex items-center border-b border-border px-3 text-[10px] font-semibold uppercase tracking-wider text-text-muted"
-                style={{ height: ROW_H }}
-              >
-                Role
+          {/* Single scroll container for the entire grid */}
+          <div
+            ref={resourceScrollRef}
+            className="overflow-auto bg-sidebar"
+            style={{ maxHeight: 300 }}
+          >
+            <div style={{ width: totalWidth, minWidth: '100%' }}>
+              {/* Header row — sticky top */}
+              <div className="flex sticky top-0 z-20 border-b border-border bg-sidebar" style={{ height: ROW_H }}>
+                <div
+                  className="sticky left-0 z-30 shrink-0 flex items-center px-3 border-r border-border bg-sidebar"
+                  style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Role</span>
+                </div>
+                {dates.map((d) => (
+                  <div
+                    key={d.str}
+                    onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
+                    className={`shrink-0 flex flex-col items-center justify-center text-center border-r border-border/30 cursor-pointer
+                      hover:bg-accent/15 transition-colors select-none
+                      ${d.isToday ? 'bg-accent/10 font-bold' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}
+                      ${colHighlight(d.str)}`}
+                    style={{ width: colWidth, height: ROW_H }}
+                  >
+                    <span className={`text-[9px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted'}`}>{d.day}</span>
+                    <span className={`text-[8px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted/60'}`}>{d.abbr}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Scrolling role labels */}
-              <div
-                ref={roleColRef}
-                className="overflow-hidden"
-                style={{ maxHeight: 300 - ROW_H, scrollbarWidth: 'none' }}
-              >
-                {departments.map((dept) => {
-                  const roles = RATE_CARD.filter((e) => e.department === dept && !hiddenSet.has(e.role));
-                  if (roles.length === 0) return null;
-                  return (
-                    <div key={dept}>
-                      <div
-                        className="flex items-center px-3 bg-bg-alt/60 border-b border-border/50"
-                        style={{ height: ROW_H }}
-                      >
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
-                          {dept}
-                        </span>
-                      </div>
-                      {roles.map((entry) => {
-                        const activeLevel = getActiveLevel(entry.role);
-                        const personName = (roleNames || {})[entry.role] || '';
-                        return (
-                          <div
-                            key={entry.role}
-                            className="flex items-center px-2 border-b border-border/30 hover:bg-bg-alt/50 transition-colors group/role gap-1"
-                            style={{ height: ROW_H }}
-                          >
-                            {/* Remove role button */}
-                            <button
-                              onClick={() => onHideRole(entry.role)}
-                              className="shrink-0 opacity-0 group-hover/role:opacity-100 rounded p-0 text-text-muted/40 hover:text-red-500 transition"
-                              title="Remove role"
-                            >
-                              <X size={11} />
-                            </button>
-                            {/* Role title + person name */}
-                            <div className="flex-1 min-w-0 flex items-center gap-1 group-hover/role:hidden">
-                              <span className="text-[11px] text-text truncate">{entry.role}</span>
-                              {personName && (
-                                <span className="text-[10px] text-accent truncate shrink-0 max-w-[70px]">· {personName}</span>
-                              )}
-                              <span className="text-[10px] text-text-muted font-mono ml-auto shrink-0">${entry.rate}</span>
-                            </div>
-                            {/* Hover state: editable name + quick-fill */}
-                            <div className="flex-1 min-w-0 items-center gap-1 hidden group-hover/role:flex">
-                              <span className="text-[10px] text-text truncate shrink-0 max-w-[80px]">{entry.role}</span>
-                              <input
-                                type="text"
-                                value={personName}
-                                onChange={(e) => onRoleNameChange(entry.role, e.target.value)}
-                                placeholder="Name…"
-                                className="text-[10px] text-accent bg-transparent border-none outline-none flex-1 min-w-0 truncate placeholder:text-text-muted/30"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div className="flex items-center gap-0.5 shrink-0">
-                                {[2, 4, 8].map((h) => (
-                                  <button
-                                    key={h}
-                                    onClick={() => onQuickFill(entry.role, activeLevel === h ? 0 : h)}
-                                    className={`rounded px-1 py-0 text-[9px] font-bold leading-tight transition
-                                      ${activeLevel === h
-                                        ? 'bg-accent text-white'
-                                        : 'bg-bg-alt text-text-muted hover:bg-accent/20 hover:text-accent'
-                                      }`}
-                                    title={h === 2 ? 'Oversight (2h/day)' : h === 4 ? 'Half-time (4h/day)' : 'Full-time (8h/day)'}
-                                  >
-                                    {h}h
-                                  </button>
-                                ))}
+              {/* Department + role rows */}
+              {departments.map((dept) => {
+                const roles = RATE_CARD.filter((e) => e.department === dept && !hiddenSet.has(e.role));
+                if (roles.length === 0) return null;
+                return (
+                  <div key={dept}>
+                    {/* Department header */}
+                    <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
+                      <DeptCell>
+                        <div className="flex items-center px-3 h-full">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{dept}</span>
+                        </div>
+                      </DeptCell>
+                      {dates.map((d) => (
+                        <div
+                          key={d.str}
+                          className={`shrink-0 border-r border-border/20 bg-bg-alt/60
+                            ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
+                          style={{ width: colWidth, height: ROW_H }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Role rows */}
+                    {roles.map((entry) => {
+                      const roleData = resourceHours[entry.role] || {};
+                      const activeLevel = getActiveLevel(entry.role);
+                      const personName = (roleNames || {})[entry.role] || '';
+                      return (
+                        <div key={entry.role} className="flex border-b border-border/30" style={{ height: ROW_H }}>
+                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role">
+                            <div className="flex items-center px-2 h-full gap-1">
+                              <button
+                                onClick={() => onHideRole(entry.role)}
+                                className="shrink-0 opacity-0 group-hover/role:opacity-100 rounded p-0 text-text-muted/40 hover:text-red-500 transition"
+                                title="Remove role"
+                              >
+                                <X size={11} />
+                              </button>
+                              <div className="flex-1 min-w-0 flex items-center gap-1 group-hover/role:hidden">
+                                <span className="text-[11px] text-text truncate">{entry.role}</span>
+                                {personName && (
+                                  <span className="text-[10px] text-accent truncate shrink-0 max-w-[70px]">· {personName}</span>
+                                )}
+                                <span className="text-[10px] text-text-muted font-mono ml-auto shrink-0">${entry.rate}</span>
+                              </div>
+                              <div className="flex-1 min-w-0 items-center gap-1 hidden group-hover/role:flex">
+                                <span className="text-[10px] text-text truncate shrink-0 max-w-[80px]">{entry.role}</span>
+                                <input
+                                  type="text"
+                                  value={personName}
+                                  onChange={(e) => onRoleNameChange(entry.role, e.target.value)}
+                                  placeholder="Name…"
+                                  className="text-[10px] text-accent bg-transparent border-none outline-none flex-1 min-w-0 truncate placeholder:text-text-muted/30"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  {[2, 4, 8].map((h) => (
+                                    <button
+                                      key={h}
+                                      onClick={() => onQuickFill(entry.role, activeLevel === h ? 0 : h)}
+                                      className={`rounded px-1 py-0 text-[9px] font-bold leading-tight transition
+                                        ${activeLevel === h
+                                          ? 'bg-accent text-white'
+                                          : 'bg-bg-alt text-text-muted hover:bg-accent/20 hover:text-accent'
+                                        }`}
+                                      title={h === 2 ? 'Oversight (2h/day)' : h === 4 ? 'Half-time (4h/day)' : 'Full-time (8h/day)'}
+                                    >
+                                      {h}h
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                          </RoleCell>
+                          {dates.map((d) => {
+                            const hours = roleData[d.str] || 0;
+                            return (
+                              <div
+                                key={d.str}
+                                className={`shrink-0 border-r border-border/20 flex items-center justify-center
+                                  ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
+                                  ${colHighlight(d.str)}`}
+                                style={{ width: colWidth, height: ROW_H }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="24"
+                                  value={hours || ''}
+                                  onChange={(e) => handleInputChange(entry.role, d.str, e.target.value)}
+                                  className="w-full h-full bg-transparent text-center text-[10px] font-mono text-text
+                                    focus:bg-accent/10 focus:outline-none focus:ring-1 focus:ring-accent/30
+                                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  style={{ width: colWidth }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
 
-                {/* Add role back button */}
-                {hiddenSet.size > 0 && (
-                  <div className="relative" ref={addRoleRef}>
+              {/* Add role back button */}
+              {hiddenSet.size > 0 && (
+                <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
+                  <div
+                    className={`${stickyLeft} shrink-0 border-r border-border bg-sidebar`}
+                    style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
+                    ref={addRoleRef}
+                  >
                     <div
-                      className="flex items-center px-3 border-b border-border/50 hover:bg-bg-alt/50 cursor-pointer transition"
-                      style={{ height: ROW_H }}
+                      className="flex items-center px-3 h-full hover:bg-bg-alt/50 cursor-pointer transition"
                       onClick={() => setAddRoleOpen((o) => !o)}
                     >
                       <Plus size={11} className="text-accent mr-1" />
@@ -488,210 +504,96 @@ export default function ResourceGrid({
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* OOP section */}
-                <div
-                  className="flex items-center px-3 bg-bg-alt/60 border-b border-border/50"
-                  style={{ height: ROW_H }}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
-                    OOP Expenses
-                  </span>
-                  <button
-                    onClick={onAddOop}
-                    className="ml-auto flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/10 transition"
-                  >
-                    <Plus size={10} />
-                    Add
-                  </button>
-                </div>
-                {(oopExpenses || []).map((oop) => (
-                  <div
-                    key={oop.id}
-                    className="flex items-center px-2 border-b border-border/30 hover:bg-bg-alt/50 transition-colors group gap-1"
-                    style={{ height: ROW_H }}
-                  >
-                    <button
-                      onClick={() => onRemoveOop(oop.id)}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 rounded p-0 text-text-muted/40 hover:text-red-500 transition"
-                    >
-                      <X size={11} />
-                    </button>
-                    <input
-                      type="text"
-                      value={oop.name}
-                      onChange={(e) => onOopChange(oop.id, 'name', e.target.value)}
-                      placeholder="Description…"
-                      className="text-[11px] text-text bg-transparent border-none outline-none flex-1 min-w-0 truncate"
-                    />
-                    <div className="shrink-0 flex items-center gap-0.5">
-                      <span className="text-[10px] text-text-muted">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={oop.amount || ''}
-                        onChange={(e) => onOopChange(oop.id, 'amount', e.target.value)}
-                        placeholder="0"
-                        className="w-[60px] text-[10px] font-mono text-text bg-transparent border-none outline-none text-right
-                          [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Scrollable day columns */}
-            <div
-              ref={resourceScrollRef}
-              className="flex-1 overflow-auto bg-sidebar"
-              style={{ maxHeight: 300 }}
-            >
-              <div style={{ width: gridWidth, minWidth: '100%' }}>
-                {/* Day header row */}
-                <div className="flex border-b border-border sticky top-0 bg-sidebar z-10" style={{ height: ROW_H }}>
                   {dates.map((d) => (
-                    <div
-                      key={d.str}
-                      onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
-                      className={`shrink-0 flex flex-col items-center justify-center text-center border-r border-border/30 cursor-pointer
-                        hover:bg-accent/15 transition-colors select-none
-                        ${d.isToday ? 'bg-accent/10 font-bold' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                        ${colHighlight(d.str)}`}
-                      style={{ width: colWidth, height: ROW_H }}
-                    >
-                      <span className={`text-[9px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted'}`}>
-                        {d.day}
-                      </span>
-                      <span className={`text-[8px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted/60'}`}>
-                        {d.abbr}
-                      </span>
-                    </div>
+                    <div key={d.str} className="shrink-0 border-r border-border/20" style={{ width: colWidth, height: ROW_H }} />
                   ))}
                 </div>
+              )}
 
-                {/* Department + role data rows */}
-                {departments.map((dept) => {
-                  const roles = RATE_CARD.filter((e) => e.department === dept && !hiddenSet.has(e.role));
-                  if (roles.length === 0) return null;
-                  return (
-                    <div key={dept}>
-                      {/* Department header */}
-                      <div className="flex border-b border-border/50 bg-bg-alt/60" style={{ height: ROW_H }}>
-                        {dates.map((d) => (
-                          <div
-                            key={d.str}
-                            className={`shrink-0 border-r border-border/20
-                              ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
-                            style={{ width: colWidth, height: ROW_H }}
-                          />
-                        ))}
-                      </div>
-                      {/* Role rows */}
-                      {roles.map((entry) => {
-                        const roleData = resourceHours[entry.role] || {};
-                        return (
-                          <div key={entry.role} className="flex border-b border-border/30" style={{ height: ROW_H }}>
-                            {dates.map((d) => {
-                              const hours = roleData[d.str] || 0;
-                              return (
-                                <div
-                                  key={d.str}
-                                  className={`shrink-0 border-r border-border/20 flex items-center justify-center
-                                    ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                                    ${colHighlight(d.str)}`}
-                                  style={{ width: colWidth, height: ROW_H }}
-                                >
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="24"
-                                    value={hours || ''}
-                                    onChange={(e) => handleInputChange(entry.role, d.str, e.target.value)}
-                                    className="w-full h-full bg-transparent text-center text-[10px] font-mono text-text
-                                      focus:bg-accent/10 focus:outline-none focus:ring-1 focus:ring-accent/30
-                                      [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    style={{ width: colWidth }}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-
-                {/* Add Role spacer row (matches left column) */}
-                {hiddenSet.size > 0 && (
-                  <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
-                    {dates.map((d) => (
-                      <div key={d.str} className="shrink-0 border-r border-border/20" style={{ width: colWidth, height: ROW_H }} />
-                    ))}
+              {/* OOP section */}
+              <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
+                <DeptCell>
+                  <div className="flex items-center justify-between px-3 h-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">OOP Expenses</span>
+                    <button
+                      onClick={onAddOop}
+                      className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-accent hover:bg-accent/10 transition"
+                    >
+                      <Plus size={10} />
+                      Add
+                    </button>
                   </div>
-                )}
-
-                {/* OOP section */}
-                <div className="flex border-b border-border/50 bg-bg-alt/60" style={{ height: ROW_H }}>
+                </DeptCell>
+                {dates.map((d) => (
+                  <div
+                    key={d.str}
+                    className={`shrink-0 border-r border-border/20 bg-bg-alt/60
+                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
+                    style={{ width: colWidth, height: ROW_H }}
+                  />
+                ))}
+              </div>
+              {(oopExpenses || []).map((oop) => (
+                <div key={oop.id} className="flex border-b border-border/30" style={{ height: ROW_H }}>
+                  <RoleCell className="hover:bg-bg-alt/50 transition-colors group">
+                    <div className="flex items-center px-2 h-full gap-1">
+                      <button
+                        onClick={() => onRemoveOop(oop.id)}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 rounded p-0 text-text-muted/40 hover:text-red-500 transition"
+                      >
+                        <X size={11} />
+                      </button>
+                      <input
+                        type="text"
+                        value={oop.name}
+                        onChange={(e) => onOopChange(oop.id, 'name', e.target.value)}
+                        placeholder="Description…"
+                        className="text-[11px] text-text bg-transparent border-none outline-none flex-1 min-w-0 truncate"
+                      />
+                      <div className="shrink-0 flex items-center gap-0.5">
+                        <span className="text-[10px] text-text-muted">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={oop.amount || ''}
+                          onChange={(e) => onOopChange(oop.id, 'amount', e.target.value)}
+                          placeholder="0"
+                          className="w-[60px] text-[10px] font-mono text-text bg-transparent border-none outline-none text-right
+                            [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                    </div>
+                  </RoleCell>
                   {dates.map((d) => (
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/20
-                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
+                        ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
+                        ${colHighlight(d.str)}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
                 </div>
-                {(oopExpenses || []).map((oop) => (
-                  <div key={oop.id} className="flex border-b border-border/30" style={{ height: ROW_H }}>
-                    {dates.map((d) => (
-                      <div
-                        key={d.str}
-                        className={`shrink-0 border-r border-border/20
-                          ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                          ${colHighlight(d.str)}`}
-                        style={{ width: colWidth, height: ROW_H }}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Frozen bottom: Hours/Day + Total Budget */}
           <div className="flex border-t-2 border-border shrink-0">
-            {/* Left labels */}
             <div
               className="shrink-0 border-r border-border bg-sidebar z-10"
               style={{ width: ROLE_COL_WIDTH }}
             >
-              <div
-                className="flex items-center justify-between px-3 border-b border-border/50"
-                style={{ height: ROW_H }}
-              >
+              <div className="flex items-center justify-between px-3 border-b border-border/50" style={{ height: ROW_H }}>
                 <span className="text-[11px] font-semibold text-text">Hours / Day</span>
               </div>
-              <div
-                className="flex items-center justify-between px-3"
-                style={{ height: ROW_H }}
-              >
+              <div className="flex items-center justify-between px-3" style={{ height: ROW_H }}>
                 <span className="text-[11px] font-bold text-text">Total Budget</span>
-                <span className="text-[11px] font-bold text-accent font-mono">
-                  {formatCurrency(totals.grandTotal)}
-                </span>
+                <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(totals.grandTotal)}</span>
               </div>
             </div>
-
-            {/* Scrollable totals (synced horizontally) */}
-            <div
-              ref={bottomScrollRef}
-              className="flex-1 overflow-hidden"
-            >
+            <div ref={bottomScrollRef} className="flex-1 overflow-hidden">
               <div style={{ width: gridWidth, minWidth: '100%' }}>
-                {/* Hours per day row */}
                 <div className="flex border-b border-border/50 bg-sidebar" style={{ height: ROW_H }}>
                   {dates.map((d) => {
                     const dayHours = totals.hoursPerDay[d.str] || 0;
@@ -710,7 +612,6 @@ export default function ResourceGrid({
                     );
                   })}
                 </div>
-                {/* Empty row under total budget label (no per-day cost) */}
                 <div className="flex bg-sidebar" style={{ height: ROW_H }}>
                   {dates.map((d) => (
                     <div
