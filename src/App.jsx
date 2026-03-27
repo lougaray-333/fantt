@@ -1,14 +1,22 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import AuthGate from './components/AuthGate';
 import GanttEditor from './components/GanttEditor';
 import ProjectDashboard from './components/ProjectDashboard';
 import LandingPage from './components/LandingPage';
+import GodMode from './components/GodMode';
 import { useProjects } from './hooks/useProjects';
 
 const EMAIL_KEY = 'fantt-user-email';
 const STORAGE_KEY = 'gantt-v2-tasks';
 
 export default function App() {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem(EMAIL_KEY));
@@ -48,6 +56,11 @@ export default function App() {
       // stay on dashboard
     }
   };
+
+  // God Mode admin dashboard
+  if (hash === '#/godmode') {
+    return <GodMode />;
+  }
 
   // Landing page for new visitors
   if (showLanding && !email) {

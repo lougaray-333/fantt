@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign, Zap } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign, Zap, Undo2, Redo2 } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -8,10 +8,12 @@ import GanttChart from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
 import ViewModeToggle from './ViewModeToggle';
-import Legend from './Legend';
+
 import ActivityLibrary from './ActivityLibrary';
 import ListView from './ListView';
 import ResourceGrid from './ResourceGrid';
+import { useHistory } from '../hooks/useHistory';
+import { supabase, isConfigured } from '../lib/supabase';
 
 export default function GanttEditor({ projectId, email, onBack }) {
   const store = useTaskStore(projectId);
@@ -41,7 +43,64 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
   const [highlightedDate, setHighlightedDate] = useState(null);
 
-  // Auto-save budget data to localStorage (debounced to avoid blocking UI)
+  // Undo/Redo
+  const history = useHistory();
+  const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {} });
+  useEffect(() => {
+    stateRef.current = { tasks: store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames };
+  }, [store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames]);
+
+  const getCurrentSnapshot = () => ({ ...stateRef.current });
+
+  const restoreSnapshot = useCallback((snapshot) => {
+    store.setTasksDirect(snapshot.tasks);
+    setResourceHours(snapshot.resourceHours);
+    setOopExpenses(snapshot.oopExpenses);
+    setHiddenRoles(snapshot.hiddenRoles);
+    setRoleNames(snapshot.roleNames);
+  }, [store]);
+
+  const snap = () => history.pushSnapshot(getCurrentSnapshot());
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const snapshot = history.redo(getCurrentSnapshot());
+          if (snapshot) restoreSnapshot(snapshot);
+        } else {
+          const snapshot = history.undo(getCurrentSnapshot());
+          if (snapshot) restoreSnapshot(snapshot);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [history, restoreSnapshot]);
+
+  // Load budget data from Supabase on mount (falls back to localStorage init above)
+  const budgetLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!isConfigured || !projectId || budgetLoadedRef.current) return;
+    budgetLoadedRef.current = true;
+    supabase
+      .from('project_budgets')
+      .select('resource_hours, oop_expenses, hidden_roles, role_names')
+      .eq('project_id', projectId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          if (data.resource_hours) setResourceHours(data.resource_hours);
+          if (data.oop_expenses) setOopExpenses(data.oop_expenses);
+          if (data.hidden_roles) setHiddenRoles(data.hidden_roles);
+          if (data.role_names) setRoleNames(data.role_names);
+        }
+      });
+  }, [projectId]);
+
+  // Auto-save budget data to localStorage + Supabase (debounced)
   const saveBudgetRef = useRef(null);
   useEffect(() => {
     clearTimeout(saveBudgetRef.current);
@@ -50,8 +109,19 @@ export default function GanttEditor({ projectId, email, onBack }) {
       localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
       localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
       localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
+      // Sync to Supabase
+      if (isConfigured && projectId) {
+        supabase.from('project_budgets').upsert({
+          project_id: projectId,
+          resource_hours: resourceHours,
+          oop_expenses: oopExpenses,
+          hidden_roles: hiddenRoles,
+          role_names: roleNames,
+          updated_at: new Date().toISOString(),
+        }).then(() => {});
+      }
     }, 500);
-  }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey]);
+  }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey, projectId]);
 
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
@@ -81,18 +151,22 @@ export default function GanttEditor({ projectId, email, onBack }) {
   }, [clearScrollLock]);
 
   const handleHideRole = useCallback((role) => {
+    snap();
     setHiddenRoles((prev) => [...prev, role]);
   }, []);
 
   const handleShowRole = useCallback((role) => {
+    snap();
     setHiddenRoles((prev) => prev.filter((r) => r !== role));
   }, []);
 
   const handleRoleNameChange = useCallback((role, name) => {
+    snap();
     setRoleNames((prev) => ({ ...prev, [role]: name }));
   }, []);
 
   const handleResourceHoursChange = useCallback((role, dateStr, hours) => {
+    snap();
     setResourceHours((prev) => ({
       ...prev,
       [role]: { ...(prev[role] || {}), [dateStr]: hours },
@@ -102,6 +176,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   // Quick-fill: set hours for every weekday across the project's actual task date range
   const handleQuickFill = useCallback((role, hoursPerDay) => {
     if (store.tasks.length === 0) return;
+    snap();
     if (hoursPerDay === 0) {
       setResourceHours((prev) => ({ ...prev, [role]: {} }));
       return;
@@ -125,6 +200,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   }, [store.tasks]);
 
   const handleAddOop = useCallback(() => {
+    snap();
     setOopExpenses((prev) => [
       ...prev,
       { id: `oop-${Date.now()}`, name: '', amount: 0 },
@@ -132,10 +208,12 @@ export default function GanttEditor({ projectId, email, onBack }) {
   }, []);
 
   const handleRemoveOop = useCallback((oopId) => {
+    snap();
     setOopExpenses((prev) => prev.filter((o) => o.id !== oopId));
   }, []);
 
   const handleOopChange = useCallback((oopId, field, value) => {
+    snap();
     setOopExpenses((prev) =>
       prev.map((o) => {
         if (o.id !== oopId) return o;
@@ -171,6 +249,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   }, []);
 
   const handleLoadPreset = () => {
+    snap();
     const PRESET = [
       { name: 'Project Kickoff & Alignment', phase: 'Insight', days: 2 },
       { name: 'Stakeholder Interviews', phase: 'Insight', days: 5 },
@@ -222,6 +301,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   };
 
   const handleAddFromLibrary = (activities) => {
+    snap();
     let cursor = new Date();
     if (store.tasks.length > 0) {
       const lastEnd = store.tasks.reduce((max, t) => {
@@ -248,6 +328,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   };
 
   const handleAddOrUpdate = (formData) => {
+    snap();
     if (editingTask) {
       store.updateTask(editingTask.id, formData);
       setEditingId(null);
@@ -264,6 +345,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const handleDeleteTask = useCallback((id) => {
     const task = store.tasks.find((t) => t.id === id);
     if (!task || !confirm(`Delete "${task.name}"?`)) return;
+    snap();
     store.deleteTask(id);
     selectedIds.delete(id);
     setSelectedIds(new Set(selectedIds));
@@ -276,6 +358,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`Delete ${selectedIds.size} selected task${selectedIds.size > 1 ? 's' : ''}?`)) return;
+    snap();
     for (const id of selectedIds) {
       store.deleteTask(id);
     }
@@ -359,9 +442,6 @@ export default function GanttEditor({ projectId, email, onBack }) {
             <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
           )}
 
-          {/* Legend */}
-          <Legend tasks={store.tasks} />
-
           {/* Budget toggle */}
           <button
             onClick={() => setBudgetOpen((o) => !o)}
@@ -377,6 +457,24 @@ export default function GanttEditor({ projectId, email, onBack }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Undo / Redo */}
+          <button
+            onClick={() => { const s = history.undo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
+            disabled={!history.canUndo}
+            className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Undo (Cmd+Z)"
+          >
+            <Undo2 size={15} />
+          </button>
+          <button
+            onClick={() => { const s = history.redo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
+            disabled={!history.canRedo}
+            className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Redo (Cmd+Shift+Z)"
+          >
+            <Redo2 size={15} />
+          </button>
+
           {/* Delete selected */}
           {selectedIds.size > 1 && (
             <button
@@ -504,8 +602,8 @@ export default function GanttEditor({ projectId, email, onBack }) {
                   handleSelect(id, false);
                 }
               }}
-              onTaskUpdate={store.updateTask}
-              onBeginDrag={store.beginDrag}
+              onTaskUpdate={(id, updates) => { snap(); store.updateTask(id, updates); }}
+              onBeginDrag={() => { snap(); store.beginDrag(); }}
               onDragMove={store.dragMove}
               onEndDrag={store.endDrag}
               onResizeEnd={(taskId) => {
@@ -517,6 +615,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
                 setTimeout(() => setAnimatingTask(null), 350);
               }}
               onReorder={(fromIndex, toIndex) => {
+                snap();
                 store.reorderTasks(fromIndex, toIndex);
                 const task = store.tasks[fromIndex];
                 if (task) {

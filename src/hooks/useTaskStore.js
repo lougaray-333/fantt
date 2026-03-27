@@ -322,6 +322,23 @@ export function useTaskStore(projectId) {
     }
   }, [projectId, touchProject]);
 
+  const setTasksDirect = useCallback((newTasks) => {
+    setTasks(newTasks);
+    if (isConfigured && projectId) {
+      // Delete all project tasks and re-insert
+      supabase
+        .from('tasks')
+        .delete()
+        .eq('project_id', projectId)
+        .then(() => {
+          const rows = newTasks.map((t, i) => taskToRow({ ...t, sortOrder: i }, projectId));
+          if (rows.length > 0) {
+            supabase.from('tasks').insert(rows).then(() => touchProject());
+          }
+        });
+    }
+  }, [projectId, touchProject]);
+
   const updateProject = useCallback(async (updates) => {
     if (!isConfigured || !projectId) return;
     await supabase
@@ -345,5 +362,6 @@ export function useTaskStore(projectId) {
     reorderTasks,
     importTasks,
     updateProject,
+    setTasksDirect,
   };
 }
