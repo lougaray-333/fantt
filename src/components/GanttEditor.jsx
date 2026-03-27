@@ -123,6 +123,28 @@ export default function GanttEditor({ projectId, email, onBack }) {
     }, 500);
   }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey, projectId]);
 
+  // Auto-save every 30 seconds with toast notification
+  const [autoSaveToast, setAutoSaveToast] = useState(null); // 'in' | 'out' | null
+  useEffect(() => {
+    if (!isConfigured || !projectId) return;
+    const interval = setInterval(() => {
+      // Budget is already synced via the debounced effect above, but force a fresh upsert
+      supabase.from('project_budgets').upsert({
+        project_id: projectId,
+        resource_hours: stateRef.current.resourceHours,
+        oop_expenses: stateRef.current.oopExpenses,
+        hidden_roles: stateRef.current.hiddenRoles,
+        role_names: stateRef.current.roleNames,
+        updated_at: new Date().toISOString(),
+      }).then(() => {
+        setAutoSaveToast('in');
+        setTimeout(() => setAutoSaveToast('out'), 2000);
+        setTimeout(() => setAutoSaveToast(null), 2400);
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [projectId]);
+
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
   const resourceScrollRef = useRef(null);
@@ -526,10 +548,10 @@ export default function GanttEditor({ projectId, email, onBack }) {
           <button
             onClick={toggleTheme}
             className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
-            title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Fantasy mode'}
+            title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Dark mode'}
           >
             {theme === 'fantasy' ? <Sun size={14} /> : <Moon size={14} />}
-            {theme === 'fantasy' ? 'Light' : 'Fantasy'}
+            {theme === 'fantasy' ? 'Light' : 'Dark'}
           </button>
         </div>
       </div>
@@ -626,6 +648,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
             />
           </div>
           {budgetOpen && (
+            <div style={{ animation: 'fantt-slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
             <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
@@ -648,6 +671,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
               highlightedDate={highlightedDate}
               onDateClick={setHighlightedDate}
             />
+            </div>
           )}
         </div>
       )}
@@ -697,6 +721,21 @@ export default function GanttEditor({ projectId, email, onBack }) {
         onAddActivities={handleAddFromLibrary}
         existingTasks={store.tasks}
       />
+
+      {/* Auto-save toast */}
+      {autoSaveToast && (
+        <div
+          className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
+          style={{
+            animation: autoSaveToast === 'in'
+              ? 'fantt-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+              : 'fantt-toast-out 0.3s ease-in forwards',
+          }}
+        >
+          <Check size={12} className="text-green-500" />
+          <span className="text-xs text-text-muted">Auto-saved</span>
+        </div>
+      )}
     </div>
   );
 }

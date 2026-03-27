@@ -13,8 +13,8 @@
   --color-today: #ef4444;
   --color-weekend: #f8fafc;
   --color-grid: #f1f5f9;
-  --color-logo-start: #3b82f6;
-  --color-logo-end: #3b82f6;
+  --color-logo-start: #e63946;
+  --color-logo-end: #d62828;
   --font-sans: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
@@ -123,6 +123,22 @@ body {
   30% { transform: translateY(-3px); }
   60% { transform: translateY(1px); }
   100% { transform: translateY(0); }
+}
+
+/* Toast slide in from right */
+@keyframes fantt-toast-in {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes fantt-toast-out {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(120%); opacity: 0; }
+}
+
+/* Resource grid slide up from bottom */
+@keyframes fantt-slide-up {
+  from { transform: translateY(100%); opacity: 0.5; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 
 /* New task pop-in — scale from small with overshoot */

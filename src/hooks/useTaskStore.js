@@ -68,6 +68,7 @@ export function useTaskStore(projectId) {
   const [loading, setLoading] = useState(isConfigured);
   const [saveStatus, setSaveStatus] = useState('idle');
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  const taskCountRef = useRef(0);
   const dragSnapshotRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
@@ -113,7 +114,9 @@ export function useTaskStore(projectId) {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (!error && data) {
-          setTasks(data.map(rowToTask));
+          const mapped = data.map(rowToTask);
+          taskCountRef.current = mapped.length;
+          setTasks(mapped);
         }
         setLoading(false);
       });
@@ -133,6 +136,8 @@ export function useTaskStore(projectId) {
 
   const addTask = useCallback((task) => {
     const id = crypto.randomUUID();
+    const sortOrder = taskCountRef.current;
+    taskCountRef.current += 1;
     const newTask = {
       id,
       name: task.name,
@@ -142,14 +147,11 @@ export function useTaskStore(projectId) {
       progress: task.progress || 0,
       dependencies: task.dependencies || [],
       color: task.color || '',
-      sortOrder: 0,
+      sortOrder,
       assignees: task.assignees || [],
     };
 
-    setTasks((prev) => {
-      newTask.sortOrder = prev.length;
-      return [...prev, newTask];
-    });
+    setTasks((prev) => [...prev, newTask]);
 
     if (isConfigured) {
       supabase
@@ -247,6 +249,7 @@ export function useTaskStore(projectId) {
   }, [touchProject]);
 
   const deleteTask = useCallback((id) => {
+    taskCountRef.current = Math.max(0, taskCountRef.current - 1);
     setTasks((prev) =>
       prev
         .filter((t) => t.id !== id)
@@ -302,6 +305,7 @@ export function useTaskStore(projectId) {
         const rows = tasksWithIds.map((t) => taskToRow(t, projectId));
         await supabase.from('tasks').insert(rows);
       }
+      taskCountRef.current = tasksWithIds.length;
       setTasks(tasksWithIds);
     } else {
       setTasks((prev) => {
@@ -323,6 +327,7 @@ export function useTaskStore(projectId) {
   }, [projectId, touchProject]);
 
   const setTasksDirect = useCallback((newTasks) => {
+    taskCountRef.current = newTasks.length;
     setTasks(newTasks);
     if (isConfigured && projectId) {
       // Delete all project tasks and re-insert
