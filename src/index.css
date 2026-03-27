@@ -91,11 +91,19 @@ body {
   from { transform: translateX(100%); opacity: 0.5; }
   to   { transform: translateX(0); opacity: 1; }
 }
+@keyframes fantt-slide-out {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(100%); opacity: 0; }
+}
 
 /* Backdrop fade-in */
 @keyframes fantt-backdrop-in {
   from { background: rgba(0,0,0,0); }
   to   { background: rgba(0,0,0,0.3); }
+}
+@keyframes fantt-backdrop-out {
+  from { background: rgba(0,0,0,0.3); }
+  to   { background: rgba(0,0,0,0); }
 }
 
 /* View switch — quick crossfade */
@@ -135,10 +143,14 @@ body {
   to   { transform: translateX(120%); opacity: 0; }
 }
 
-/* Resource grid slide up from bottom */
+/* Resource grid slide up/down */
 @keyframes fantt-slide-up {
   from { transform: translateY(100%); opacity: 0.5; }
   to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes fantt-slide-down {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
 }
 
 /* New task pop-in — scale from small with overshoot */

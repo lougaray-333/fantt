@@ -31,5 +31,5 @@ export function getAllGroups(tasks) {
   tasks.forEach((t) => {
     if (t.group) groups.add(t.group);
   });
-  return [...groups];
+  return [...groups].sort();
 }

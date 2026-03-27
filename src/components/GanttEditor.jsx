@@ -24,6 +24,8 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [editingId, setEditingId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [formClosing, setFormClosing] = useState(false);
+  const [budgetClosing, setBudgetClosing] = useState(false);
   const [animatingTask, setAnimatingTask] = useState(null);
   // Budget data — auto-saved to localStorage keyed by projectId
   const budgetKey = `gantt-v2-budget-${projectId || 'local'}`;
@@ -256,6 +258,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const primarySelectedId = editingId || (selectedIds.size === 1 ? [...selectedIds][0] : null);
 
   const handleSelect = useCallback((id, multiSelect) => {
+    if (!multiSelect) snap(); // snapshot before opening edit form
     if (multiSelect) {
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -350,12 +353,11 @@ export default function GanttEditor({ projectId, email, onBack }) {
   };
 
   const handleAddOrUpdate = (formData) => {
-    snap();
     if (editingTask) {
+      // Auto-save: just update, don't close form or snap (would flood history)
       store.updateTask(editingTask.id, formData);
-      setEditingId(null);
-      setFormOpen(false);
     } else {
+      snap();
       const task = store.addTask(formData);
       setSelectedIds(new Set([task.id]));
       setAnimatingTask({ id: task.id, type: 'pop-in' });
@@ -395,8 +397,12 @@ export default function GanttEditor({ projectId, email, onBack }) {
   };
 
   const handleCloseForm = () => {
-    setEditingId(null);
-    setFormOpen(false);
+    setFormClosing(true);
+    setTimeout(() => {
+      setEditingId(null);
+      setFormOpen(false);
+      setFormClosing(false);
+    }, 250);
   };
 
   if (store.loading) {
@@ -466,7 +472,14 @@ export default function GanttEditor({ projectId, email, onBack }) {
 
           {/* Budget toggle */}
           <button
-            onClick={() => setBudgetOpen((o) => !o)}
+            onClick={() => {
+              if (budgetOpen) {
+                setBudgetClosing(true);
+                setTimeout(() => { setBudgetOpen(false); setBudgetClosing(false); }, 250);
+              } else {
+                setBudgetOpen(true);
+              }
+            }}
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
               budgetOpen
                 ? 'bg-accent/15 text-accent'
@@ -648,7 +661,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
             />
           </div>
           {budgetOpen && (
-            <div style={{ animation: 'fantt-slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+            <div style={{ animation: `${budgetClosing ? 'fantt-slide-down' : 'fantt-slide-up'} 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards` }}>
             <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
@@ -683,12 +696,12 @@ export default function GanttEditor({ projectId, email, onBack }) {
           <div
             className="fixed inset-0 z-40"
             onClick={handleCloseForm}
-            style={{ animation: 'fantt-backdrop-in 0.25s ease-out forwards' }}
+            style={{ animation: `${formClosing ? 'fantt-backdrop-out' : 'fantt-backdrop-in'} 0.25s ease-out forwards` }}
           />
           {/* Panel */}
           <div
             className="fixed right-0 top-0 z-50 flex h-full w-96 flex-col border-l border-border bg-sidebar shadow-xl"
-            style={{ animation: 'fantt-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+            style={{ animation: `${formClosing ? 'fantt-slide-out' : 'fantt-slide-in'} 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards` }}
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-sm font-bold text-text">

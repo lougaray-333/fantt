@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Plus, Save, X, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, X, Trash2, Check, Loader2 } from 'lucide-react';
 import { formatDate } from '../utils/dates';
 import { PRESET_COLORS } from '../utils/colors';
-
-const PHASES = ['Insight', 'Vision', 'Execute'];
 
 export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDelete }) {
   // Default start = day after the last task's end date, or today
@@ -28,6 +26,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
   const [customHex, setCustomHex] = useState('');
 
   useEffect(() => {
+    initialLoadRef.current = true;
     if (editingTask) {
       const color = editingTask.color || '';
       setForm({
@@ -51,6 +50,27 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
       setCustomHex('');
     }
   }, [editingTask]);
+
+  // Auto-save when editing: debounce form changes
+  const [saveIndicator, setSaveIndicator] = useState(null); // 'saving' | 'saved' | null
+  const autoSaveRef = useRef(null);
+  const initialLoadRef = useRef(true);
+  useEffect(() => {
+    // Skip auto-save on initial load and when not editing
+    if (!editingTask) { initialLoadRef.current = true; return; }
+    if (initialLoadRef.current) { initialLoadRef.current = false; return; }
+    if (!form.name.trim() || !form.start || !form.end) return;
+
+    clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(() => {
+      setSaveIndicator('saving');
+      onSubmit(form);
+      setTimeout(() => setSaveIndicator('saved'), 200);
+      setTimeout(() => setSaveIndicator(null), 1500);
+    }, 500);
+
+    return () => clearTimeout(autoSaveRef.current);
+  }, [form, editingTask]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -120,20 +140,6 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-xs font-medium text-text-muted">Phase</label>
-        <select
-          value={form.group}
-          onChange={(e) => setForm({ ...form, group: e.target.value })}
-          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
-        >
-          <option value="">No Phase</option>
-          {PHASES.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
       </div>
 
       {/* Color picker */}
@@ -279,24 +285,35 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
         </div>
       )}
 
-      <div className="flex gap-2 pt-1">
-        <button
-          type="submit"
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          {editingTask ? <Save size={14} /> : <Plus size={14} />}
-          {editingTask ? 'Update' : 'Add Task'}
-        </button>
-        {editingTask && (
+      {editingTask ? (
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-xs text-text-muted/60">
+            {saveIndicator === 'saving' ? (
+              <span className="flex items-center gap-1">
+                <Loader2 size={10} className="animate-spin" />
+                Saving…
+              </span>
+            ) : saveIndicator === 'saved' ? (
+              <span className="flex items-center gap-1 text-green-500">
+                <Check size={10} />
+                Saved
+              </span>
+            ) : (
+              <span className="text-text-muted/40">Changes auto-save</span>
+            )}
+          </span>
+        </div>
+      ) : (
+        <div className="flex gap-2 pt-1">
           <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-text-muted hover:bg-bg-alt"
+            type="submit"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90"
           >
-            Cancel
+            <Plus size={14} />
+            Add Task
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {editingTask && onDelete && (
         <button
           type="button"
