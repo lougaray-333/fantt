@@ -225,7 +225,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
     let cursor = new Date();
     if (store.tasks.length > 0) {
       const lastEnd = store.tasks.reduce((max, t) => {
-        const d = new Date(t.end);
+        const d = new Date(t.end + 'T00:00:00');
         return d > max ? d : max;
       }, new Date(0));
       cursor = addDays(lastEnd, 1);

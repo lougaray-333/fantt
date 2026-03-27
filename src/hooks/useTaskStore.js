@@ -212,8 +212,8 @@ export function useTaskStore(projectId) {
         if (affectedIds.has(t.id)) {
           return {
             ...t,
-            start: formatDate(addDays(new Date(t.start), daysDelta)),
-            end: formatDate(addDays(new Date(t.end), daysDelta)),
+            start: formatDate(addDays(new Date(t.start + 'T00:00:00'), daysDelta)),
+            end: formatDate(addDays(new Date(t.end + 'T00:00:00'), daysDelta)),
           };
         }
         return t;

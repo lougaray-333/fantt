@@ -178,13 +178,13 @@ export default function GanttChart({
         if (type === 'move') {
           onDragMove(task.id, daysDelta);
         } else if (type === 'resize-end') {
-          const newEnd = addDays(new Date(origEnd), daysDelta);
-          if (newEnd >= new Date(origStart)) {
+          const newEnd = addDays(new Date(origEnd + 'T00:00:00'), daysDelta);
+          if (newEnd >= new Date(origStart + 'T00:00:00')) {
             onTaskUpdate(task.id, { end: formatDate(newEnd) });
           }
         } else if (type === 'resize-start') {
-          const newStart = addDays(new Date(origStart), daysDelta);
-          if (newStart <= new Date(origEnd)) {
+          const newStart = addDays(new Date(origStart + 'T00:00:00'), daysDelta);
+          if (newStart <= new Date(origEnd + 'T00:00:00')) {
             onTaskUpdate(task.id, { start: formatDate(newStart) });
           }
         }
@@ -334,7 +334,7 @@ export default function GanttChart({
             <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} />
           </marker>
           {tasks.map((task) => {
-            const x = dayToX(new Date(task.start));
+            const x = dayToX(task.start);
             const barWidth = Math.max((diffDays(task.start, task.end) + 1) * colWidth, colWidth);
             return (
               <clipPath key={`clip-${task.id}`} id={`clip-${task.id}`}>
@@ -559,11 +559,11 @@ export default function GanttChart({
             if (depIdx === -1) return null;
             const dep = tasks[depIdx];
             const depBarEnd =
-              dayToX(new Date(dep.end)) +
-              Math.max((diffDays(dep.end, addDays(new Date(dep.end), 1))) * colWidth, colWidth);
+              dayToX(dep.end) +
+              Math.max((diffDays(dep.end, addDays(new Date(dep.end + 'T00:00:00'), 1))) * colWidth, colWidth);
             const fromX = depBarEnd;
             const fromY = HEADER_HEIGHT + depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
-            const toX = dayToX(new Date(task.start));
+            const toX = dayToX(task.start);
             const toY = HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2;
 
             const gap = 10;
@@ -593,7 +593,7 @@ export default function GanttChart({
 
         {/* Task bars */}
         {tasks.map((task, i) => {
-          const x = dayToX(new Date(task.start));
+          const x = dayToX(task.start);
           const duration = diffDays(task.start, task.end) + 1;
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = HEADER_HEIGHT + i * ROW_HEIGHT + BAR_Y_OFFSET;
