@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Trash2, Check, Loader2 } from 'lucide-react';
+import { Plus, X, Trash2, Check } from 'lucide-react';
 import { formatDate } from '../utils/dates';
 import { PRESET_COLORS } from '../utils/colors';
 
@@ -52,21 +52,21 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
   }, [editingTask]);
 
   // Auto-save when editing: debounce form changes
-  const [saveIndicator, setSaveIndicator] = useState(null); // 'saving' | 'saved' | null
+  const [showSaved, setShowSaved] = useState(false);
   const autoSaveRef = useRef(null);
+  const savedTimerRef = useRef(null);
   const initialLoadRef = useRef(true);
   useEffect(() => {
-    // Skip auto-save on initial load and when not editing
     if (!editingTask) { initialLoadRef.current = true; return; }
     if (initialLoadRef.current) { initialLoadRef.current = false; return; }
     if (!form.name.trim() || !form.start || !form.end) return;
 
     clearTimeout(autoSaveRef.current);
     autoSaveRef.current = setTimeout(() => {
-      setSaveIndicator('saving');
       onSubmit(form);
-      setTimeout(() => setSaveIndicator('saved'), 200);
-      setTimeout(() => setSaveIndicator(null), 1500);
+      setShowSaved(true);
+      clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setShowSaved(false), 1500);
     }, 500);
 
     return () => clearTimeout(autoSaveRef.current);
@@ -286,23 +286,12 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
       )}
 
       {editingTask ? (
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-xs text-text-muted/60">
-            {saveIndicator === 'saving' ? (
-              <span className="flex items-center gap-1">
-                <Loader2 size={10} className="animate-spin" />
-                Saving…
-              </span>
-            ) : saveIndicator === 'saved' ? (
-              <span className="flex items-center gap-1 text-green-500">
-                <Check size={10} />
-                Saved
-              </span>
-            ) : (
-              <span className="text-text-muted/40">Changes auto-save</span>
-            )}
-          </span>
-        </div>
+        showSaved ? (
+          <div className="flex items-center gap-1 pt-1 text-xs text-green-500">
+            <Check size={10} />
+            Saved
+          </div>
+        ) : null
       ) : (
         <div className="flex gap-2 pt-1">
           <button
