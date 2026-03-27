@@ -25,7 +25,6 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formClosing, setFormClosing] = useState(false);
-  const [budgetClosing, setBudgetClosing] = useState(false);
   const [animatingTask, setAnimatingTask] = useState(null);
   // Budget data — auto-saved to localStorage keyed by projectId
   const budgetKey = `gantt-v2-budget-${projectId || 'local'}`;
@@ -41,7 +40,6 @@ export default function GanttEditor({ projectId, email, onBack }) {
   const [roleNames, setRoleNames] = useState(() => {
     try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
   });
-  const [budgetOpen, setBudgetOpen] = useState(true);
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
   const [highlightedDate, setHighlightedDate] = useState(null);
 
@@ -472,16 +470,9 @@ export default function GanttEditor({ projectId, email, onBack }) {
 
           {/* Budget toggle */}
           <button
-            onClick={() => {
-              if (budgetOpen) {
-                setBudgetClosing(true);
-                setTimeout(() => { setBudgetOpen(false); setBudgetClosing(false); }, 250);
-              } else {
-                setBudgetOpen(true);
-              }
-            }}
+            onClick={() => setBudgetCollapsed((c) => !c)}
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-              budgetOpen
+              !budgetCollapsed
                 ? 'bg-accent/15 text-accent'
                 : 'text-text-muted hover:bg-bg-alt'
             }`}
@@ -660,9 +651,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
               }}
             />
           </div>
-          {budgetOpen && (
-            <div style={{ animation: `${budgetClosing ? 'fantt-slide-down' : 'fantt-slide-up'} 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards` }}>
-            <ResourceGrid
+          <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
               resourceHours={resourceHours}
@@ -684,8 +673,6 @@ export default function GanttEditor({ projectId, email, onBack }) {
               highlightedDate={highlightedDate}
               onDateClick={setHighlightedDate}
             />
-            </div>
-          )}
         </div>
       )}
 
