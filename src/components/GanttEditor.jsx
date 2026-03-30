@@ -16,20 +16,23 @@ import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
 
 function shiftAllHours(resourceHours, daysDelta) {
+  const dir = daysDelta >= 0 ? 1 : -1;
   const shifted = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
     const entries = Object.entries(dates)
       .filter(([, h]) => h > 0)
-      .sort(([a], [b]) => a.localeCompare(b));
+      .sort(([a], [b]) => dir * a.localeCompare(b)); // process in shift direction
     const newDates = {};
     const usedDates = new Set();
     for (const [dateStr, hours] of entries) {
       let newDate = addDays(dateStr, daysDelta);
-      while (isWeekend(newDate)) newDate = addDays(newDate, 1);
+      // Skip weekends in the direction of travel
+      while (isWeekend(newDate)) newDate = addDays(newDate, dir);
       let newDateStr = formatDate(newDate);
+      // Resolve collisions in the direction of travel
       while (usedDates.has(newDateStr)) {
-        newDate = addDays(newDate, 1);
-        while (isWeekend(newDate)) newDate = addDays(newDate, 1);
+        newDate = addDays(newDate, dir);
+        while (isWeekend(newDate)) newDate = addDays(newDate, dir);
         newDateStr = formatDate(newDate);
       }
       usedDates.add(newDateStr);
