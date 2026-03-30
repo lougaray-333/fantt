@@ -652,8 +652,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
                 setAnimatingTask({ id: taskId, type: 'bounce-v' });
                 setTimeout(() => setAnimatingTask(null), 350);
               }}
+              onBeginReorder={() => snap()}
               onReorder={(fromIndex, toIndex) => {
-                snap();
                 store.reorderTasks(fromIndex, toIndex);
                 const task = store.tasks[fromIndex];
                 if (task) {

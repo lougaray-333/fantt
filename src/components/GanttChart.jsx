@@ -21,6 +21,7 @@ export default function GanttChart({
   onDragMove,
   onEndDrag,
   onReorder,
+  onBeginReorder,
   onResizeEnd,
   onMoveEnd,
   selectedId,
@@ -251,6 +252,7 @@ export default function GanttChart({
       e.preventDefault();
       if (!onReorder) return;
 
+      onBeginReorder?.();
       const startY = e.clientY;
       let currentIndex = taskIndex;
 
@@ -276,7 +278,7 @@ export default function GanttChart({
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    [tasks.length, onReorder]
+    [tasks.length, onReorder, onBeginReorder]
   );
 
   // Background click-and-drag to pan/scroll
