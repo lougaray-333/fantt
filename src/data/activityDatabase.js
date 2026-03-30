@@ -2,6 +2,8 @@
 // Schema matches the Activity Database Template (Excel).
 // durationDays: [min, max] working days parsed from "Standard Duration" column.
 
+import { supabase, isConfigured } from '../lib/supabase';
+
 const activityDatabase = [
   // ─── INSIGHT PHASE ───────────────────────────────────────────────
   {
@@ -868,16 +870,48 @@ A simple prototype is an efficient way to convey ideas and get feedback quickly,
   },
 ];
 
+// Static fallback — used if Supabase fetch fails
+export const ACTIVITIES_FALLBACK = activityDatabase;
 export default activityDatabase;
 
+// Fetch activities from Supabase, fall back to static array
+export async function fetchActivities() {
+  try {
+    if (!isConfigured || !supabase) return activityDatabase;
+
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .order('id');
+
+    if (error || !data || data.length === 0) return activityDatabase;
+
+    // Map Supabase snake_case → camelCase to match existing shape
+    return data.map((row) => ({
+      id: row.id,
+      inByDefault: row.in_by_default ?? false,
+      name: row.name,
+      phase: row.phase,
+      duration: row.duration || '',
+      durationDays: [row.duration_days_min ?? row.duration_days ?? 0, row.duration_days_max ?? row.duration_days ?? 0],
+      owner: row.owner || '',
+      contributors: row.contributors || '',
+      scoping: row.scoping || '',
+      description: row.description || '',
+    }));
+  } catch {
+    return activityDatabase;
+  }
+}
+
 // Helper: get unique phases
-export function getPhases() {
-  return [...new Set(activityDatabase.map((a) => a.phase))];
+export function getPhases(activities = activityDatabase) {
+  return [...new Set(activities.map((a) => a.phase))];
 }
 
 // Helper: get unique owners
-export function getOwners() {
-  return [...new Set(activityDatabase.map((a) => a.owner))];
+export function getOwners(activities = activityDatabase) {
+  return [...new Set(activities.map((a) => a.owner))];
 }
 
 // Helper: filter activities

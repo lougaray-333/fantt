@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { X, Search, Plus, ChevronDown, ChevronRight, Clock, User, Info } from 'lucide-react';
-import activityDatabase, { getPhases, getOwners } from '../data/activityDatabase';
+import { useState, useMemo, useEffect } from 'react';
+import { X, Search, Plus, ChevronDown, ChevronRight, Clock, User, Info, Loader2 } from 'lucide-react';
+import activityDatabase, { fetchActivities, getPhases, getOwners } from '../data/activityDatabase';
 
 const PHASE_COLORS = {
   Insight: '#6366f1',
@@ -15,12 +15,23 @@ export default function ActivityLibrary({ open, onClose, onAddActivities, existi
   const [defaultOnly, setDefaultOnly] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [expandedId, setExpandedId] = useState(null);
+  const [activities, setActivities] = useState(activityDatabase);
+  const [loadingActivities, setLoadingActivities] = useState(false);
 
-  const phases = useMemo(() => getPhases(), []);
-  const owners = useMemo(() => getOwners(), []);
+  // Fetch from Supabase when opened
+  useEffect(() => {
+    if (!open) return;
+    setLoadingActivities(true);
+    fetchActivities()
+      .then((data) => setActivities(data))
+      .finally(() => setLoadingActivities(false));
+  }, [open]);
+
+  const phases = useMemo(() => getPhases(activities), [activities]);
+  const owners = useMemo(() => getOwners(activities), [activities]);
 
   const filtered = useMemo(() => {
-    return activityDatabase.filter((a) => {
+    return activities.filter((a) => {
       if (phaseFilter && a.phase !== phaseFilter) return false;
       if (ownerFilter && a.owner !== ownerFilter) return false;
       if (defaultOnly && !a.inByDefault) return false;
@@ -34,7 +45,7 @@ export default function ActivityLibrary({ open, onClose, onAddActivities, existi
       }
       return true;
     });
-  }, [search, phaseFilter, ownerFilter, defaultOnly]);
+  }, [activities, search, phaseFilter, ownerFilter, defaultOnly]);
 
   // Group by phase
   const grouped = useMemo(() => {
@@ -56,13 +67,13 @@ export default function ActivityLibrary({ open, onClose, onAddActivities, existi
   };
 
   const selectAllDefaults = () => {
-    const defaults = activityDatabase.filter((a) => a.inByDefault).map((a) => a.id);
+    const defaults = activities.filter((a) => a.inByDefault).map((a) => a.id);
     setSelected(new Set(defaults));
   };
 
   const handleAdd = () => {
-    const activities = activityDatabase.filter((a) => selected.has(a.id));
-    onAddActivities(activities);
+    const selectedActivities = activities.filter((a) => selected.has(a.id));
+    onAddActivities(selectedActivities);
     setSelected(new Set());
     onClose();
   };
@@ -82,7 +93,7 @@ export default function ActivityLibrary({ open, onClose, onAddActivities, existi
           <div>
             <h2 className="text-base font-bold text-text">Activity Library</h2>
             <p className="mt-0.5 text-xs text-text-muted">
-              {activityDatabase.length} pre-built activities across {phases.length} phases
+              {loadingActivities ? 'Loading...' : `${activities.length} pre-built activities across ${phases.length} phases`}
             </p>
           </div>
           <button
@@ -142,7 +153,7 @@ export default function ActivityLibrary({ open, onClose, onAddActivities, existi
             onClick={selectAllDefaults}
             className="rounded-md bg-accent/10 px-2.5 py-1 font-medium text-accent hover:bg-accent/20"
           >
-            Select all defaults ({activityDatabase.filter((a) => a.inByDefault).length})
+            Select all defaults ({activities.filter((a) => a.inByDefault).length})
           </button>
           <button
             onClick={() => setSelected(new Set(filtered.map((a) => a.id)))}

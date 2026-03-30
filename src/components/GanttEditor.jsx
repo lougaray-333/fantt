@@ -10,6 +10,7 @@ import InlineTaskTable from './InlineTaskTable';
 import ViewModeToggle from './ViewModeToggle';
 
 import ActivityLibrary from './ActivityLibrary';
+import BugReportButton from './BugReportButton';
 import ListView from './ListView';
 import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
@@ -721,6 +722,9 @@ export default function GanttEditor({ projectId, email, onBack }) {
         onAddActivities={handleAddFromLibrary}
         existingTasks={store.tasks}
       />
+
+      {/* Bug Report Button */}
+      <BugReportButton />
 
       {/* Auto-save toast */}
       {autoSaveToast && (
