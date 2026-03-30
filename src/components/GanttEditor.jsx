@@ -16,7 +16,19 @@ import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
 
-export default function GanttEditor({ projectId, email, onBack }) {
+function shiftAllHours(resourceHours, daysDelta) {
+  const shifted = {};
+  for (const [role, dates] of Object.entries(resourceHours)) {
+    shifted[role] = {};
+    for (const [dateStr, hours] of Object.entries(dates)) {
+      const newDate = formatDate(addDays(dateStr, daysDelta));
+      shifted[role][newDate] = hours;
+    }
+  }
+  return shifted;
+}
+
+export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const store = useTaskStore(projectId);
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
@@ -145,6 +157,9 @@ export default function GanttEditor({ projectId, email, onBack }) {
     }, 30000);
     return () => clearInterval(interval);
   }, [projectId]);
+
+  // Track drag delta for shifting resource hours
+  const dragDeltaRef = useRef(0);
 
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
@@ -415,7 +430,7 @@ export default function GanttEditor({ projectId, email, onBack }) {
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-sidebar shrink-0">
+      <div className="flex items-center border-b border-border px-4 py-2 bg-sidebar shrink-0">
         <div className="flex items-center gap-4">
           {/* Back button */}
           {onBack && (
@@ -482,6 +497,13 @@ export default function GanttEditor({ projectId, email, onBack }) {
             Budget
           </button>
         </div>
+
+        {/* Project name — centered */}
+        {projectName && (
+          <div className="flex-1 flex justify-center min-w-0 px-4">
+            <span className="text-sm font-medium text-text-muted truncate">{projectName}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           {/* Undo / Redo */}
@@ -630,9 +652,16 @@ export default function GanttEditor({ projectId, email, onBack }) {
                 }
               }}
               onTaskUpdate={(id, updates) => { snap(); store.updateTask(id, updates); }}
-              onBeginDrag={() => { snap(); store.beginDrag(); }}
-              onDragMove={store.dragMove}
-              onEndDrag={store.endDrag}
+              onBeginDrag={() => { snap(); dragDeltaRef.current = 0; store.beginDrag(); }}
+              onDragMove={(taskId, daysDelta) => { dragDeltaRef.current = daysDelta; store.dragMove(taskId, daysDelta); }}
+              onEndDrag={() => {
+                const delta = dragDeltaRef.current;
+                if (delta !== 0) {
+                  setResourceHours(prev => shiftAllHours(prev, delta));
+                }
+                store.endDrag();
+                dragDeltaRef.current = 0;
+              }}
               onResizeEnd={(taskId) => {
                 setAnimatingTask({ id: taskId, type: 'bounce-h' });
                 setTimeout(() => setAnimatingTask(null), 300);

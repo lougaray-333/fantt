@@ -117,9 +117,11 @@ export default function App() {
   }
 
   // Gantt editor
+  const activeProject = projectStore.projects.find(p => p.id === activeProjectId);
   return (
     <GanttEditor
       projectId={activeProjectId}
+      projectName={activeProject?.name || ''}
       email={email}
       onBack={() => setActiveProjectId(null)}
     />
