@@ -3,7 +3,7 @@ import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Che
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
-import { formatDate, addDays, isWeekend } from '../utils/dates';
+import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
 import GanttChart from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
@@ -15,43 +15,31 @@ import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
 
-function shiftAllHours(resourceHours, daysDelta, tasks) {
-  if (daysDelta === 0) return resourceHours;
+// Shift resource hours by business days derived from the calendar delta.
+// Tasks shift by calendarDelta calendar days. We figure out how many business
+// days that represents, then shift each hour entry by that many business days.
+// This guarantees weekdays map 1:1 to weekdays — no collisions, no weekends.
+function shiftAllHours(resourceHours, calendarDelta, refDate) {
+  if (calendarDelta === 0) return resourceHours;
 
-  // Build set of weekdays covered by any task (already at new positions)
-  const validDates = new Set();
-  for (const task of tasks) {
-    let cursor = new Date(task.start + 'T00:00:00');
-    const end = new Date(task.end + 'T00:00:00');
-    while (cursor <= end) {
-      if (!isWeekend(cursor)) validDates.add(formatDate(cursor));
-      cursor = addDays(cursor, 1);
-    }
-  }
+  // How many business days does this calendar shift represent?
+  // Use refDate (the dragged task's original start) as reference.
+  const dest = addDays(refDate, calendarDelta);
+  const bizDelta = calendarDelta >= 0
+    ? businessDaysBetween(refDate, dest)
+    : -businessDaysBetween(dest, refDate);
+
+  if (bizDelta === 0) return resourceHours;
 
   const shifted = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
-    const entries = Object.entries(dates)
-      .filter(([, h]) => h > 0)
-      .sort(([a], [b]) => a.localeCompare(b)); // always ascending
     const newDates = {};
-    const usedDates = new Set();
-    for (const [dateStr, hours] of entries) {
-      let newDate = addDays(dateStr, daysDelta);
-      // Always snap weekends forward to Monday
-      while (isWeekend(newDate)) newDate = addDays(newDate, 1);
-      let newDateStr = formatDate(newDate);
-      // Resolve collisions forward
-      while (usedDates.has(newDateStr)) {
-        newDate = addDays(newDate, 1);
-        while (isWeekend(newDate)) newDate = addDays(newDate, 1);
-        newDateStr = formatDate(newDate);
-      }
-      usedDates.add(newDateStr);
-      // Only keep hours on weekdays within task date ranges
-      if (validDates.has(newDateStr)) {
-        newDates[newDateStr] = hours;
-      }
+    for (const [dateStr, hours] of Object.entries(dates)) {
+      if (hours <= 0) continue;
+      // Shift this entry by bizDelta business days
+      const newCalDays = businessToCalendarDays(dateStr, bizDelta);
+      const newDateStr = formatDate(addDays(dateStr, newCalDays));
+      newDates[newDateStr] = hours;
     }
     shifted[role] = newDates;
   }
@@ -194,8 +182,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
     return () => clearInterval(interval);
   }, [projectId]);
 
-  // Track drag delta for shifting resource hours
+  // Track drag delta and reference date for shifting resource hours
   const dragDeltaRef = useRef(0);
+  const dragRefDateRef = useRef(null);
 
   // Scroll sync refs
   const ganttScrollRef = useRef(null);
@@ -652,15 +641,24 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
                 }
               }}
               onTaskUpdate={(id, updates) => { snap(); store.updateTask(id, updates); }}
-              onBeginDrag={() => { snap(); dragDeltaRef.current = 0; store.beginDrag(); }}
-              onDragMove={(taskId, daysDelta) => { dragDeltaRef.current = daysDelta; store.dragMove(taskId, daysDelta); }}
+              onBeginDrag={() => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(); }}
+              onDragMove={(taskId, daysDelta) => {
+                if (!dragRefDateRef.current) {
+                  const task = store.tasks.find(t => t.id === taskId);
+                  if (task) dragRefDateRef.current = task.start;
+                }
+                dragDeltaRef.current = daysDelta;
+                store.dragMove(taskId, daysDelta);
+              }}
               onEndDrag={() => {
                 const delta = dragDeltaRef.current;
-                if (delta !== 0) {
-                  setResourceHours(prev => shiftAllHours(prev, delta, store.tasks));
+                const refDate = dragRefDateRef.current;
+                if (delta !== 0 && refDate) {
+                  setResourceHours(prev => shiftAllHours(prev, delta, refDate));
                 }
                 store.endDrag();
                 dragDeltaRef.current = 0;
+                dragRefDateRef.current = null;
               }}
               onResizeEnd={(taskId) => {
                 setAnimatingTask({ id: taskId, type: 'bounce-h' });
