@@ -27,6 +27,7 @@ function LocalInput({ value, onChange, ...props }) {
 export default memo(function ResourceGrid({
   tasks,
   viewMode,
+  hideWeekends = false,
   resourceHours,
   onHoursChange,
   onQuickFill,
@@ -55,10 +56,12 @@ export default memo(function ResourceGrid({
   const { start: rangeStart, end: rangeEnd } = useMemo(() => getDateRange(tasks), [tasks]);
   const totalDays = diffDays(rangeStart, rangeEnd);
 
+  const skipWeekends = hideWeekends && viewMode === 'day';
   const dates = useMemo(() => {
     const arr = [];
     for (let i = 0; i < totalDays; i++) {
       const d = addDays(rangeStart, i);
+      if (skipWeekends && isWeekend(d)) continue;
       arr.push({
         str: formatDate(d),
         day: d.getDate(),
@@ -68,7 +71,7 @@ export default memo(function ResourceGrid({
       });
     }
     return arr;
-  }, [rangeStart, totalDays]);
+  }, [rangeStart, totalDays, skipWeekends]);
 
   // Compute totals
   const totals = useMemo(() => {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign, Zap, Undo2, Redo2 } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -11,7 +11,6 @@ import ViewModeToggle from './ViewModeToggle';
 
 const ActivityLibrary = lazy(() => import('./ActivityLibrary'));
 const BugReportButton = lazy(() => import('./BugReportButton'));
-import ListView from './ListView';
 import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
@@ -19,11 +18,24 @@ import { supabase, isConfigured } from '../lib/supabase';
 function shiftAllHours(resourceHours, daysDelta) {
   const shifted = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
-    shifted[role] = {};
-    for (const [dateStr, hours] of Object.entries(dates)) {
-      const newDate = formatDate(addDays(dateStr, daysDelta));
-      shifted[role][newDate] = hours;
+    const entries = Object.entries(dates)
+      .filter(([, h]) => h > 0)
+      .sort(([a], [b]) => a.localeCompare(b));
+    const newDates = {};
+    const usedDates = new Set();
+    for (const [dateStr, hours] of entries) {
+      let newDate = addDays(dateStr, daysDelta);
+      while (isWeekend(newDate)) newDate = addDays(newDate, 1);
+      let newDateStr = formatDate(newDate);
+      while (usedDates.has(newDateStr)) {
+        newDate = addDays(newDate, 1);
+        while (isWeekend(newDate)) newDate = addDays(newDate, 1);
+        newDateStr = formatDate(newDate);
+      }
+      usedDates.add(newDateStr);
+      newDates[newDateStr] = hours;
     }
+    shifted[role] = newDates;
   }
   return shifted;
 }
@@ -32,7 +44,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const store = useTaskStore(projectId);
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
-  const [mainView, setMainView] = useState('gantt');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -55,6 +66,13 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   });
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
   const [highlightedDate, setHighlightedDate] = useState(null);
+  const [hideWeekends, setHideWeekends] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gantt-v2-hide-weekends')) || false; } catch { return false; }
+  });
+  // Persist hideWeekends to localStorage
+  useEffect(() => {
+    localStorage.setItem('gantt-v2-hide-weekends', JSON.stringify(hideWeekends));
+  }, [hideWeekends]);
 
   // Undo/Redo
   const history = useHistory();
@@ -449,52 +467,21 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             <span className="text-sm font-bold text-text">Fantt</span>
           </div>
 
-          {/* Gantt / List toggle with sliding pill */}
-          <div className="relative flex items-center rounded-lg border border-border bg-bg p-[3px]">
-            {/* Sliding background pill */}
-            <div
-              className="absolute top-[3px] bottom-[3px] rounded-md bg-accent transition-all duration-200 ease-out"
-              style={{
-                width: 'calc(50% - 3px)',
-                left: mainView === 'gantt' ? '3px' : 'calc(50%)',
-              }}
-            />
-            <button
-              onClick={() => setMainView('gantt')}
-              className={`relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-200 ${
-                mainView === 'gantt' ? 'text-white' : 'text-text-muted hover:text-text'
-              }`}
-            >
-              <BarChart2 size={12} />
-              Gantt
-            </button>
-            <button
-              onClick={() => setMainView('list')}
-              className={`relative z-10 flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-200 ${
-                mainView === 'list' ? 'text-white' : 'text-text-muted hover:text-text'
-              }`}
-            >
-              <List size={12} />
-              List
-            </button>
-          </div>
+          {/* View mode */}
+          <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
 
-          {/* View mode (only in gantt view) */}
-          {mainView === 'gantt' && (
-            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-          )}
-
-          {/* Budget toggle */}
+          {/* Hide weekends toggle */}
           <button
-            onClick={() => setBudgetCollapsed((c) => !c)}
+            onClick={() => setHideWeekends((h) => !h)}
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-              !budgetCollapsed
+              hideWeekends
                 ? 'bg-accent/15 text-accent'
                 : 'text-text-muted hover:bg-bg-alt'
             }`}
+            title={hideWeekends ? 'Show weekends' : 'Hide weekends'}
           >
-            <DollarSign size={13} />
-            Budget
+            <CalendarOff size={13} />
+            Weekends
           </button>
         </div>
 
@@ -617,12 +604,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             </div>
           </div>
         </div>
-      ) : mainView === 'list' ? (
-        <ListView
-          tasks={store.tasks}
-          onTaskUpdate={store.updateTask}
-          onTaskClick={(id) => handleSelect(id, false)}
-        />
       ) : (
         <div className="flex flex-1 flex-col min-h-0">
           <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0 items-start">
@@ -636,6 +617,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             <GanttChart
               tasks={store.tasks}
               viewMode={viewMode}
+              hideWeekends={hideWeekends}
               selectedId={primarySelectedId}
               selectedIds={selectedIds}
               animatingTask={animatingTask}
@@ -684,6 +666,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
           <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
+              hideWeekends={hideWeekends}
               resourceHours={resourceHours}
               onHoursChange={handleResourceHoursChange}
               onQuickFill={handleQuickFill}

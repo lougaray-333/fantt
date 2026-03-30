@@ -1,5 +1,5 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
@@ -14,6 +14,7 @@ export function getHeaderHeight(viewMode) {
 export default function GanttChart({
   tasks,
   viewMode = 'week',
+  hideWeekends = false,
   onTaskClick,
   onTaskUpdate,
   onBeginDrag,
@@ -42,16 +43,21 @@ export default function GanttChart({
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
 
   const { start: rangeStart, end: rangeEnd } = useMemo(() => getDateRange(tasks), [tasks]);
-  const totalDays = diffDays(rangeStart, rangeEnd);
+  const skipWeekends = hideWeekends && viewMode === 'day';
+  const totalDays = skipWeekends ? businessDaysBetween(rangeStart, rangeEnd) : diffDays(rangeStart, rangeEnd);
   const chartWidth = Math.max(totalDays * colWidth, 800);
   const chartHeight = HEADER_HEIGHT + tasks.length * ROW_HEIGHT + 20;
 
   const todayStr = useMemo(() => formatDate(new Date()), []);
-  const todayX = diffDays(rangeStart, todayStr) * colWidth;
+  const todayX = skipWeekends
+    ? businessDaysBetween(rangeStart, todayStr) * colWidth
+    : diffDays(rangeStart, todayStr) * colWidth;
   const showToday = todayX >= 0 && todayX <= chartWidth;
 
   function dayToX(date) {
-    return diffDays(rangeStart, date) * colWidth;
+    return skipWeekends
+      ? businessDaysBetween(rangeStart, date) * colWidth
+      : diffDays(rangeStart, date) * colWidth;
   }
 
   // Month spans for day view top row
@@ -60,19 +66,25 @@ export default function GanttChart({
     const spans = [];
     let current = new Date(rangeStart);
     while (current < rangeEnd) {
-      const x = diffDays(rangeStart, current) * colWidth;
+      const x = skipWeekends
+        ? businessDaysBetween(rangeStart, current) * colWidth
+        : diffDays(rangeStart, current) * colWidth;
       const nextMonth = new Date(current.getFullYear(), current.getMonth() + 1, 1);
       const endDate = nextMonth < rangeEnd ? nextMonth : rangeEnd;
-      const daysInSpan = diffDays(current, endDate);
-      spans.push({
-        x,
-        width: daysInSpan * colWidth,
-        label: current.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      });
+      const daysInSpan = skipWeekends
+        ? businessDaysBetween(current, endDate)
+        : diffDays(current, endDate);
+      if (daysInSpan > 0) {
+        spans.push({
+          x,
+          width: daysInSpan * colWidth,
+          label: current.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        });
+      }
       current = nextMonth;
     }
     return spans;
-  }, [viewMode, rangeStart, rangeEnd, colWidth]);
+  }, [viewMode, rangeStart, rangeEnd, colWidth, skipWeekends]);
 
   // Week spans for day view (W1, W2, etc.)
   const weekSpans = useMemo(() => {
@@ -90,8 +102,12 @@ export default function GanttChart({
       const nextMonday = addDays(monday, 7);
       const spanStart = monday < rangeStart ? rangeStart : monday;
       const spanEnd = nextMonday > rangeEnd ? rangeEnd : nextMonday;
-      const x = diffDays(rangeStart, spanStart) * colWidth;
-      const width = diffDays(spanStart, spanEnd) * colWidth;
+      const x = skipWeekends
+        ? businessDaysBetween(rangeStart, spanStart) * colWidth
+        : diffDays(rangeStart, spanStart) * colWidth;
+      const width = skipWeekends
+        ? businessDaysBetween(spanStart, spanEnd) * colWidth
+        : diffDays(spanStart, spanEnd) * colWidth;
       // Calculate week number relative to week1Monday
       const weekNum = Math.round(diffDays(week1Monday, monday) / 7) + 1;
       if (weekNum >= 1 && width > 0) {
@@ -100,17 +116,20 @@ export default function GanttChart({
       monday = nextMonday;
     }
     return spans;
-  }, [viewMode, tasks, rangeStart, rangeEnd, colWidth]);
+  }, [viewMode, tasks, rangeStart, rangeEnd, colWidth, skipWeekends]);
 
   // Header labels
   const headerLabels = useMemo(() => {
     const labels = [];
     const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     if (viewMode === 'day') {
-      for (let i = 0; i < totalDays; i++) {
+      const calendarDays = diffDays(rangeStart, rangeEnd);
+      let col = 0;
+      for (let i = 0; i < calendarDays; i++) {
         const d = addDays(rangeStart, i);
+        if (skipWeekends && isWeekend(d)) continue;
         labels.push({
-          x: i * colWidth,
+          x: col * colWidth,
           width: colWidth,
           label: d.getDate().toString(),
           sublabel: DAY_ABBRS[d.getDay()],
@@ -118,6 +137,7 @@ export default function GanttChart({
           isToday: formatDate(d) === todayStr,
           dateStr: formatDate(d),
         });
+        col++;
       }
     } else if (viewMode === 'week') {
       for (let i = 0; i < totalDays; i += 7) {
@@ -145,7 +165,7 @@ export default function GanttChart({
       }
     }
     return labels;
-  }, [rangeStart, rangeEnd, totalDays, colWidth, viewMode, todayStr]);
+  }, [rangeStart, rangeEnd, totalDays, colWidth, viewMode, todayStr, skipWeekends]);
 
   // Horizontal drag (move/resize)
   const handleMouseDown = useCallback(
@@ -164,7 +184,10 @@ export default function GanttChart({
 
       function onMove(ev) {
         const dx = ev.clientX - startX;
-        const daysDelta = Math.round(dx / colWidth);
+        const visualDelta = Math.round(dx / colWidth);
+        const daysDelta = skipWeekends
+          ? businessToCalendarDays(type === 'resize-start' ? origStart : (type === 'resize-end' ? origEnd : origStart), visualDelta)
+          : visualDelta;
         if (daysDelta === lastDelta) return;
         lastDelta = daysDelta;
         didMove = true;
@@ -218,7 +241,7 @@ export default function GanttChart({
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    [colWidth, onTaskUpdate, onBeginDrag, onDragMove, onEndDrag, onResizeEnd, onMoveEnd]
+    [colWidth, onTaskUpdate, onBeginDrag, onDragMove, onEndDrag, onResizeEnd, onMoveEnd, skipWeekends]
   );
 
   // Vertical drag (reorder rows)
@@ -594,7 +617,9 @@ export default function GanttChart({
         {/* Task bars */}
         {tasks.map((task, i) => {
           const x = dayToX(task.start);
-          const duration = diffDays(task.start, task.end) + 1;
+          const duration = skipWeekends
+            ? businessDaysBetween(task.start, addDays(task.end, 1))
+            : diffDays(task.start, task.end) + 1;
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = HEADER_HEIGHT + i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);

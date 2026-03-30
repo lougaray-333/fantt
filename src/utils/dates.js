@@ -85,3 +85,36 @@ export function getMonday(date) {
   d.setDate(diff);
   return d;
 }
+
+// Count weekdays between two dates (start inclusive, end exclusive)
+export function businessDaysBetween(start, end) {
+  let s = toLocal(start);
+  let e = toLocal(end);
+  if (s >= e) return 0;
+  let count = 0;
+  let cursor = new Date(s);
+  while (cursor < e) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+// Convert a business-day delta to a calendar-day delta from a given start date
+// e.g. businessToCalendarDays('2026-03-27' (Fri), 1) => 3 (skip Sat/Sun => Mon)
+export function businessToCalendarDays(startDate, businessDelta) {
+  const start = toLocal(startDate);
+  if (businessDelta === 0) return 0;
+  const sign = businessDelta > 0 ? 1 : -1;
+  let remaining = Math.abs(businessDelta);
+  let calendarDays = 0;
+  let cursor = new Date(start);
+  while (remaining > 0) {
+    cursor.setDate(cursor.getDate() + sign);
+    calendarDays += sign;
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) remaining--;
+  }
+  return calendarDays;
+}
