@@ -15,28 +15,42 @@ import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
 
-function shiftAllHours(resourceHours, daysDelta) {
+function shiftAllHours(resourceHours, daysDelta, tasks) {
+  if (daysDelta === 0) return resourceHours;
+
+  // Build set of weekdays covered by any task (already at new positions)
+  const validDates = new Set();
+  for (const task of tasks) {
+    let cursor = new Date(task.start + 'T00:00:00');
+    const end = new Date(task.end + 'T00:00:00');
+    while (cursor <= end) {
+      if (!isWeekend(cursor)) validDates.add(formatDate(cursor));
+      cursor = addDays(cursor, 1);
+    }
+  }
+
   const dir = daysDelta >= 0 ? 1 : -1;
   const shifted = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
     const entries = Object.entries(dates)
       .filter(([, h]) => h > 0)
-      .sort(([a], [b]) => dir * a.localeCompare(b)); // process in shift direction
+      .sort(([a], [b]) => dir * a.localeCompare(b));
     const newDates = {};
     const usedDates = new Set();
     for (const [dateStr, hours] of entries) {
       let newDate = addDays(dateStr, daysDelta);
-      // Skip weekends in the direction of travel
       while (isWeekend(newDate)) newDate = addDays(newDate, dir);
       let newDateStr = formatDate(newDate);
-      // Resolve collisions in the direction of travel
       while (usedDates.has(newDateStr)) {
         newDate = addDays(newDate, dir);
         while (isWeekend(newDate)) newDate = addDays(newDate, dir);
         newDateStr = formatDate(newDate);
       }
       usedDates.add(newDateStr);
-      newDates[newDateStr] = hours;
+      // Only keep hours on weekdays within task date ranges
+      if (validDates.has(newDateStr)) {
+        newDates[newDateStr] = hours;
+      }
     }
     shifted[role] = newDates;
   }
@@ -642,7 +656,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               onEndDrag={() => {
                 const delta = dragDeltaRef.current;
                 if (delta !== 0) {
-                  setResourceHours(prev => shiftAllHours(prev, delta));
+                  setResourceHours(prev => shiftAllHours(prev, delta, store.tasks));
                 }
                 store.endDrag();
                 dragDeltaRef.current = 0;
