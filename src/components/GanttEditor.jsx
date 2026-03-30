@@ -29,21 +29,22 @@ function shiftAllHours(resourceHours, daysDelta, tasks) {
     }
   }
 
-  const dir = daysDelta >= 0 ? 1 : -1;
   const shifted = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
     const entries = Object.entries(dates)
       .filter(([, h]) => h > 0)
-      .sort(([a], [b]) => dir * a.localeCompare(b));
+      .sort(([a], [b]) => a.localeCompare(b)); // always ascending
     const newDates = {};
     const usedDates = new Set();
     for (const [dateStr, hours] of entries) {
       let newDate = addDays(dateStr, daysDelta);
-      while (isWeekend(newDate)) newDate = addDays(newDate, dir);
+      // Always snap weekends forward to Monday
+      while (isWeekend(newDate)) newDate = addDays(newDate, 1);
       let newDateStr = formatDate(newDate);
+      // Resolve collisions forward
       while (usedDates.has(newDateStr)) {
-        newDate = addDays(newDate, dir);
-        while (isWeekend(newDate)) newDate = addDays(newDate, dir);
+        newDate = addDays(newDate, 1);
+        while (isWeekend(newDate)) newDate = addDays(newDate, 1);
         newDateStr = formatDate(newDate);
       }
       usedDates.add(newDateStr);
