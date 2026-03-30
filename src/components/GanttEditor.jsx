@@ -71,6 +71,20 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
     try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
   });
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
+  // Sync resource grid scroll to gantt when budget expands
+  const prevCollapsedRef = useRef(budgetCollapsed);
+  useEffect(() => {
+    const wasCollapsed = prevCollapsedRef.current;
+    prevCollapsedRef.current = budgetCollapsed;
+    if (wasCollapsed && !budgetCollapsed) {
+      // Just expanded — sync scroll on next frame after DOM mounts
+      requestAnimationFrame(() => {
+        const gantt = ganttScrollRef.current;
+        const resource = resourceScrollRef.current;
+        if (gantt && resource) resource.scrollLeft = gantt.scrollLeft;
+      });
+    }
+  }, [budgetCollapsed]);
   const [highlightedDate, setHighlightedDate] = useState(null);
   const [hideWeekends, setHideWeekends] = useState(() => {
     try { return JSON.parse(localStorage.getItem('gantt-v2-hide-weekends')) || false; } catch { return false; }
