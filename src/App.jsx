@@ -1,13 +1,23 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import AuthGate from './components/AuthGate';
 import GanttEditor from './components/GanttEditor';
 import ProjectDashboard from './components/ProjectDashboard';
-import LandingPage from './components/LandingPage';
-import GodMode from './components/GodMode';
 import { useProjects } from './hooks/useProjects';
+
+// Lazy-load routes that aren't needed on initial render
+const LandingPage = lazy(() => import('./components/LandingPage'));
+const GodMode = lazy(() => import('./components/GodMode'));
 
 const EMAIL_KEY = 'fantt-user-email';
 const STORAGE_KEY = 'gantt-v2-tasks';
+
+function LoadingSpinner() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-bg">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-amber-400" />
+    </div>
+  );
+}
 
 export default function App() {
   const [hash, setHash] = useState(() => window.location.hash);
@@ -16,6 +26,13 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  // Swap favicon for God Mode
+  useEffect(() => {
+    const link = document.querySelector('link[rel="icon"]');
+    if (!link) return;
+    link.href = hash === '#/godmode' ? '/favicon-gold.svg' : '/favicon.svg';
+  }, [hash]);
 
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
@@ -51,7 +68,6 @@ export default function App() {
       if (tasks.length === 0) return;
       const project = await projectStore.createProject('Imported Project');
       setActiveProjectId(project.id);
-      // Tasks will be imported inside GanttEditor via the store
     } catch {
       // stay on dashboard
     }
@@ -59,12 +75,20 @@ export default function App() {
 
   // God Mode admin dashboard
   if (hash === '#/godmode') {
-    return <GodMode />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <GodMode />
+      </Suspense>
+    );
   }
 
   // Landing page for new visitors
   if (showLanding && !email) {
-    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <LandingPage onGetStarted={() => setShowLanding(false)} />
+      </Suspense>
+    );
   }
 
   // Email gate

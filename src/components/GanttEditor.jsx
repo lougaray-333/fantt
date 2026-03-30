@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, List, BarChart2, Check, DollarSign, Zap, Undo2, Redo2 } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
@@ -9,8 +9,8 @@ import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
 import ViewModeToggle from './ViewModeToggle';
 
-import ActivityLibrary from './ActivityLibrary';
-import BugReportButton from './BugReportButton';
+const ActivityLibrary = lazy(() => import('./ActivityLibrary'));
+const BugReportButton = lazy(() => import('./BugReportButton'));
 import ListView from './ListView';
 import ResourceGrid from './ResourceGrid';
 import { useHistory } from '../hooks/useHistory';
@@ -716,15 +716,19 @@ export default function GanttEditor({ projectId, email, onBack }) {
       )}
 
       {/* Activity Library Modal */}
-      <ActivityLibrary
-        open={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
-        onAddActivities={handleAddFromLibrary}
-        existingTasks={store.tasks}
-      />
+      <Suspense fallback={null}>
+        <ActivityLibrary
+          open={libraryOpen}
+          onClose={() => setLibraryOpen(false)}
+          onAddActivities={handleAddFromLibrary}
+          existingTasks={store.tasks}
+        />
+      </Suspense>
 
       {/* Bug Report Button */}
-      <BugReportButton />
+      <Suspense fallback={null}>
+        <BugReportButton />
+      </Suspense>
 
       {/* Auto-save toast */}
       {autoSaveToast && (
