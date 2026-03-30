@@ -200,32 +200,14 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const dragDeltaRef = useRef(0);
   const dragRefDateRef = useRef(null);
 
-  // Scroll sync refs
+  // Scroll sync refs — gantt drives, resource follows
   const ganttScrollRef = useRef(null);
   const resourceScrollRef = useRef(null);
-  const scrollSourceRef = useRef(null); // 'gantt' | 'resource' | null
-  const scrollTimerRef = useRef(null);
-
-  const clearScrollLock = useCallback(() => {
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(() => { scrollSourceRef.current = null; }, 60);
-  }, []);
 
   const handleGanttScroll = useCallback((scrollLeft) => {
-    if (scrollSourceRef.current === 'resource') return;
-    scrollSourceRef.current = 'gantt';
     const el = resourceScrollRef.current;
     if (el) el.scrollLeft = scrollLeft;
-    clearScrollLock();
-  }, [clearScrollLock]);
-
-  const handleResourceScroll = useCallback((scrollLeft) => {
-    if (scrollSourceRef.current === 'gantt') return;
-    scrollSourceRef.current = 'resource';
-    const el = ganttScrollRef.current;
-    if (el) el.scrollLeft = scrollLeft;
-    clearScrollLock();
-  }, [clearScrollLock]);
+  }, []);
 
   const handleHideRole = useCallback((role) => {
     snap();
@@ -712,7 +694,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               collapsed={budgetCollapsed}
               onToggle={() => setBudgetCollapsed((c) => !c)}
               resourceScrollRef={resourceScrollRef}
-              onHorizontalScroll={handleResourceScroll}
               highlightedDate={highlightedDate}
               onDateClick={setHighlightedDate}
             />

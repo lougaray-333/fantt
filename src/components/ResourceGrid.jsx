@@ -43,7 +43,6 @@ export default memo(function ResourceGrid({
   collapsed,
   onToggle,
   resourceScrollRef,
-  onHorizontalScroll,
   highlightedDate,
   onDateClick,
 }) {
@@ -162,24 +161,6 @@ export default memo(function ResourceGrid({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [addRoleOpen]);
-
-  // Scroll sync — fires horizontal scroll to parent
-  useEffect(() => {
-    if (!onHorizontalScroll) return;
-    const el = resourceScrollRef?.current;
-    if (!el) return;
-    let ticking = false;
-    const handler = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        onHorizontalScroll(el.scrollLeft);
-        ticking = false;
-      });
-    };
-    el.addEventListener('scroll', handler, { passive: true });
-    return () => el.removeEventListener('scroll', handler);
-  }, [onHorizontalScroll, resourceScrollRef]);
 
   // Sync frozen bottom rows horizontally with main grid
   const bottomScrollRef = useRef(null);
@@ -352,10 +333,10 @@ export default memo(function ResourceGrid({
 
       {!collapsed && (
         <div className="border-t border-border flex flex-col bg-sidebar">
-          {/* Single scroll container for the entire grid */}
+          {/* Single scroll container — horizontal scroll driven by Gantt chart */}
           <div
             ref={resourceScrollRef}
-            className="overflow-auto bg-sidebar"
+            className="overflow-y-auto overflow-x-hidden bg-sidebar"
             style={{ maxHeight: 300 }}
           >
             <div style={{ width: totalWidth, minWidth: '100%' }}>
