@@ -308,6 +308,7 @@ export function useTaskStore(projectId) {
       if (isConfigured) {
         const rows = tasksWithIds.map((t) => taskToRow(t, projectId));
         await supabase.from('tasks').insert(rows);
+        touchProject();
       }
       taskCountRef.current = tasksWithIds.length;
       setTasks(tasksWithIds);

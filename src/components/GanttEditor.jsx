@@ -54,8 +54,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, ini
   useEffect(() => {
     if (importedRef.current || store.loading || !initialTasks?.length) return;
     importedRef.current = true;
-    store.importTasks(initialTasks, 'replace');
-    if (onConsumeInitialTasks) onConsumeInitialTasks();
+    store.importTasks(initialTasks, 'replace').then(() => {
+      if (onConsumeInitialTasks) onConsumeInitialTasks();
+    });
   }, [store.loading, initialTasks, onConsumeInitialTasks]);
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
