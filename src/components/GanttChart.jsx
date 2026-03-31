@@ -47,7 +47,8 @@ export default function GanttChart({
   const skipWeekends = hideWeekends && viewMode === 'day';
   const totalDays = skipWeekends ? businessDaysBetween(rangeStart, rangeEnd) : diffDays(rangeStart, rangeEnd);
   const chartWidth = Math.max(totalDays * colWidth, 800);
-  const chartHeight = HEADER_HEIGHT + tasks.length * ROW_HEIGHT + 20;
+  const bodyHeight = tasks.length * ROW_HEIGHT + 20;
+  const chartHeight = HEADER_HEIGHT + bodyHeight;
 
   const todayStr = useMemo(() => formatDate(new Date()), []);
   const todayX = skipWeekends
@@ -340,22 +341,99 @@ export default function GanttChart({
   }, [onHorizontalScroll, scrollRef]);
 
   return (
-    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "overflow-hidden bg-bg shrink-0" : "overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab' }} onMouseDown={handlePanStart}>
+    <div ref={ganttScrollRef ? undefined : internalScrollRef} className={ganttScrollRef ? "bg-bg shrink-0" : "overflow-auto flex-1 bg-bg"} style={{ cursor: 'grab', minWidth: chartWidth }} onMouseDown={handlePanStart}>
+      {/* Sticky header */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+        <svg width={chartWidth} height={HEADER_HEIGHT} className="select-none" style={{ display: 'block' }}>
+          {/* Header background */}
+          <rect x={0} y={0} width={chartWidth} height={HEADER_HEIGHT} fill="var(--color-bg-alt)" />
+          <line x1={0} y1={HEADER_HEIGHT - 0.5} x2={chartWidth} y2={HEADER_HEIGHT - 0.5} stroke="var(--color-border)" />
+
+          {/* User-clicked column highlight in header */}
+          {highlightedDate && viewMode === 'day' && (() => {
+            const hx = dayToX(highlightedDate);
+            if (hx < 0 || hx > chartWidth) return null;
+            return (
+              <rect
+                x={hx} y={0} width={colWidth} height={HEADER_HEIGHT}
+                fill="var(--color-accent)" fillOpacity={0.08}
+                stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.4} rx={2}
+                style={{ pointerEvents: 'none' }}
+              />
+            );
+          })()}
+
+          {/* Day view: Month row */}
+          {monthSpans.map((m, i) => (
+            <g key={`month-${i}`}>
+              <text x={m.x + m.width / 2} y={18} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--color-text)" style={{ fontFamily: 'var(--font-sans)' }}>
+                {m.label}
+              </text>
+              {i > 0 && <line x1={m.x} y1={4} x2={m.x} y2={26} stroke="var(--color-border)" strokeWidth={0.5} />}
+            </g>
+          ))}
+
+          {/* Separator after month row */}
+          {viewMode === 'day' && <line x1={0} y1={28} x2={chartWidth} y2={28} stroke="var(--color-grid)" strokeWidth={0.5} />}
+
+          {/* Day view: Week number row */}
+          {weekSpans.map((w, i) => (
+            <g key={`week-${i}`}>
+              <text x={w.x + w.width / 2} y={42} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--color-text-muted)" style={{ fontFamily: 'var(--font-sans)' }}>
+                {w.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Separator after week row */}
+          {viewMode === 'day' && weekSpans.length > 0 && <line x1={0} y1={48} x2={chartWidth} y2={48} stroke="var(--color-grid)" strokeWidth={0.5} />}
+
+          {/* Header labels */}
+          {headerLabels.map((h, i) => (
+            <g key={i}>
+              {viewMode === 'day' ? (
+                <>
+                  <text x={h.x + h.width / 2} y={60} textAnchor="middle" fontSize={12} fontWeight={h.isToday ? 700 : 500} fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text)'} style={{ fontFamily: 'var(--font-sans)' }}>
+                    {h.label}
+                  </text>
+                  <text x={h.x + h.width / 2} y={74} textAnchor="middle" fontSize={9} fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text-muted)'} style={{ fontFamily: 'var(--font-sans)' }}>
+                    {h.sublabel}
+                  </text>
+                  {onDateClick && h.dateStr && (
+                    <rect x={h.x} y={48} width={h.width} height={HEADER_HEIGHT - 48} fill="transparent" style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); onDateClick(highlightedDate === h.dateStr ? null : h.dateStr); }}
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <text x={h.x + h.width / 2} y={h.sublabel ? 26 : 38} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" style={{ fontFamily: 'var(--font-sans)' }}>
+                    {h.label}
+                  </text>
+                  {h.sublabel && (
+                    <text x={h.x + h.width / 2} y={46} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--color-text-muted)" style={{ fontFamily: 'var(--font-sans)' }}>
+                      {h.sublabel}
+                    </text>
+                  )}
+                </>
+              )}
+              {/* Vertical grid line in header */}
+              <line x1={h.x} y1={0} x2={h.x} y2={HEADER_HEIGHT} stroke="var(--color-grid)" strokeWidth={0.5} />
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* Body */}
       <svg
         ref={svgRef}
         width={chartWidth}
-        height={Math.max(chartHeight, 300)}
+        height={Math.max(bodyHeight, 200)}
         className="select-none"
+        style={{ display: 'block' }}
       >
         <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="8"
-            markerHeight="6"
-            refX="8"
-            refY="3"
-            orient="auto"
-          >
+          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
             <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} />
           </marker>
           {tasks.map((task) => {
@@ -363,186 +441,42 @@ export default function GanttChart({
             const barWidth = Math.max((diffDays(task.start, task.end) + 1) * colWidth, colWidth);
             return (
               <clipPath key={`clip-${task.id}`} id={`clip-${task.id}`}>
-                <rect x={x + 6} y={0} width={barWidth - 12} height={999} />
+                <rect x={x + 6} y={0} width={barWidth - 12} height={bodyHeight + 100} />
               </clipPath>
             );
           })}
         </defs>
 
-        {/* Header background */}
-        <rect x={0} y={0} width={chartWidth} height={HEADER_HEIGHT} fill="var(--color-bg-alt)" />
-        <line x1={0} y1={HEADER_HEIGHT} x2={chartWidth} y2={HEADER_HEIGHT} stroke="var(--color-border)" />
-
-        {/* Today column highlight — dotted outline behind everything */}
+        {/* Today column highlight */}
         {showToday && (
           <rect
-            x={todayX}
-            y={HEADER_HEIGHT}
-            width={colWidth}
-            height={chartHeight - HEADER_HEIGHT}
-            fill="var(--color-accent)"
-            fillOpacity={0.04}
-            stroke="var(--color-accent)"
-            strokeWidth={1.5}
-            strokeDasharray="4,3"
-            rx={2}
+            x={todayX} y={0} width={colWidth} height={bodyHeight}
+            fill="var(--color-accent)" fillOpacity={0.04}
+            stroke="var(--color-accent)" strokeWidth={1.5} strokeDasharray="4,3" rx={2}
           />
         )}
 
-        {/* User-clicked column highlight */}
+        {/* User-clicked column highlight in body */}
         {highlightedDate && viewMode === 'day' && (() => {
           const hx = dayToX(highlightedDate);
           if (hx < 0 || hx > chartWidth) return null;
           return (
             <rect
-              x={hx}
-              y={0}
-              width={colWidth}
-              height={chartHeight}
-              fill="var(--color-accent)"
-              fillOpacity={0.08}
-              stroke="var(--color-accent)"
-              strokeWidth={2}
-              strokeOpacity={0.4}
-              rx={2}
+              x={hx} y={0} width={colWidth} height={bodyHeight}
+              fill="var(--color-accent)" fillOpacity={0.08}
+              stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.4} rx={2}
               style={{ pointerEvents: 'none' }}
             />
           );
         })()}
 
-        {/* Day view: Month row (y=18) */}
-        {monthSpans.map((m, i) => (
-          <g key={`month-${i}`}>
-            <text
-              x={m.x + m.width / 2}
-              y={18}
-              textAnchor="middle"
-              fontSize={13}
-              fontWeight={600}
-              fill="var(--color-text)"
-              style={{ fontFamily: 'var(--font-sans)' }}
-            >
-              {m.label}
-            </text>
-            {i > 0 && (
-              <line x1={m.x} y1={4} x2={m.x} y2={26} stroke="var(--color-border)" strokeWidth={0.5} />
-            )}
-          </g>
-        ))}
-
-        {/* Separator after month row in day view */}
-        {viewMode === 'day' && (
-          <line x1={0} y1={28} x2={chartWidth} y2={28} stroke="var(--color-grid)" strokeWidth={0.5} />
-        )}
-
-        {/* Day view: Week number row (y=38) */}
-        {weekSpans.map((w, i) => (
-          <g key={`week-${i}`}>
-            <text
-              x={w.x + w.width / 2}
-              y={42}
-              textAnchor="middle"
-              fontSize={10}
-              fontWeight={600}
-              fill="var(--color-text-muted)"
-              style={{ fontFamily: 'var(--font-sans)' }}
-            >
-              {w.label}
-            </text>
-          </g>
-        ))}
-
-        {/* Separator after week row in day view */}
-        {viewMode === 'day' && weekSpans.length > 0 && (
-          <line x1={0} y1={48} x2={chartWidth} y2={48} stroke="var(--color-grid)" strokeWidth={0.5} />
-        )}
-
-        {/* Header labels + vertical grid */}
+        {/* Weekend shading + vertical grid */}
         {headerLabels.map((h, i) => (
-          <g key={i}>
+          <g key={`grid-${i}`}>
             {h.isWeekend && (
-              <rect
-                x={h.x}
-                y={HEADER_HEIGHT}
-                width={h.width}
-                height={chartHeight}
-                fill="var(--color-weekend)"
-              />
+              <rect x={h.x} y={0} width={h.width} height={bodyHeight} fill="var(--color-weekend)" />
             )}
-            {viewMode === 'day' ? (
-              <>
-                <text
-                  x={h.x + h.width / 2}
-                  y={60}
-                  textAnchor="middle"
-                  fontSize={12}
-                  fontWeight={h.isToday ? 700 : 500}
-                  fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text)'}
-                  style={{ fontFamily: 'var(--font-sans)' }}
-                >
-                  {h.label}
-                </text>
-                <text
-                  x={h.x + h.width / 2}
-                  y={74}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text-muted)'}
-                  style={{ fontFamily: 'var(--font-sans)' }}
-                >
-                  {h.sublabel}
-                </text>
-                {/* Clickable header area for column highlight */}
-                {onDateClick && h.dateStr && (
-                  <rect
-                    x={h.x}
-                    y={48}
-                    width={h.width}
-                    height={HEADER_HEIGHT - 48}
-                    fill="transparent"
-                    style={{ cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDateClick(highlightedDate === h.dateStr ? null : h.dateStr);
-                    }}
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <text
-                  x={h.x + h.width / 2}
-                  y={h.sublabel ? 26 : 38}
-                  textAnchor="middle"
-                  fontSize={11}
-                  fill="var(--color-text-muted)"
-                  style={{ fontFamily: 'var(--font-sans)' }}
-                >
-                  {h.label}
-                </text>
-                {h.sublabel && (
-                  <text
-                    x={h.x + h.width / 2}
-                    y={46}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fontWeight={600}
-                    fill="var(--color-text-muted)"
-                    style={{ fontFamily: 'var(--font-sans)' }}
-                  >
-                    {h.sublabel}
-                  </text>
-                )}
-              </>
-            )}
-            <line
-              x1={h.x}
-              y1={HEADER_HEIGHT}
-              x2={h.x}
-              y2={chartHeight}
-              stroke="var(--color-grid)"
-              strokeWidth={0.5}
-            />
+            <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={0.5} />
           </g>
         ))}
 
@@ -552,27 +486,11 @@ export default function GanttChart({
           return (
           <g key={`row-${task.id}`}>
             <rect
-              x={0}
-              y={HEADER_HEIGHT + i * ROW_HEIGHT}
-              width={chartWidth}
-              height={ROW_HEIGHT}
-              fill={
-                isRowSelected
-                  ? 'var(--color-accent-light)'
-                  : i % 2 === 1
-                    ? 'var(--color-bg-alt)'
-                    : 'transparent'
-              }
+              x={0} y={i * ROW_HEIGHT} width={chartWidth} height={ROW_HEIGHT}
+              fill={isRowSelected ? 'var(--color-accent-light)' : i % 2 === 1 ? 'var(--color-bg-alt)' : 'transparent'}
               opacity={isRowSelected ? 0.4 : 0.3}
             />
-            <line
-              x1={0}
-              y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
-              x2={chartWidth}
-              y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
-              stroke="var(--color-grid)"
-              strokeWidth={0.5}
-            />
+            <line x1={0} y1={(i + 1) * ROW_HEIGHT} x2={chartWidth} y2={(i + 1) * ROW_HEIGHT} stroke="var(--color-grid)" strokeWidth={0.5} />
           </g>
           );
         })}
@@ -587,9 +505,9 @@ export default function GanttChart({
               dayToX(dep.end) +
               Math.max((diffDays(dep.end, addDays(new Date(dep.end + 'T00:00:00'), 1))) * colWidth, colWidth);
             const fromX = depBarEnd;
-            const fromY = HEADER_HEIGHT + depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const fromY = depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
             const toX = dayToX(task.start);
-            const toY = HEADER_HEIGHT + i * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const toY = i * ROW_HEIGHT + ROW_HEIGHT / 2;
 
             const gap = 10;
             const cornerX = fromX + gap;
@@ -623,14 +541,12 @@ export default function GanttChart({
             ? businessDaysBetween(task.start, addDays(task.end, 1))
             : diffDays(task.start, task.end) + 1;
           const barWidth = Math.max(duration * colWidth, colWidth);
-          const y = HEADER_HEIGHT + i * ROW_HEIGHT + BAR_Y_OFFSET;
+          const y = i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);
           const isSelected = selectedId === task.id;
           const progress = task.progress || 0;
-          const tooltipText = `${task.name}\n${formatShortDate(task.start)} – ${formatShortDate(task.end)}${task.group ? `\nPhase: ${task.group}` : ''}`;
           const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);
 
-          // Animation style — need transform-box and transform-origin for SVG
           let animStyle = {};
           if (animatingTask?.id === task.id) {
             const animMap = {
@@ -655,105 +571,40 @@ export default function GanttChart({
               key={`bar-${task.id}`}
               style={animStyle}
               onAnimationEnd={onAnimationEnd}
-              onMouseEnter={(e) => {
-                setTooltip({ x: e.clientX, y: e.clientY, task });
-              }}
-              onMouseMove={(e) => {
-                if (tooltip) setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-              }}
+              onMouseEnter={(e) => { setTooltip({ x: e.clientX, y: e.clientY, task }); }}
+              onMouseMove={(e) => { if (tooltip) setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null); }}
               onMouseLeave={() => setTooltip(null)}
             >
               {isSelected && (
-                <rect
-                  x={x - 2}
-                  y={y - 2}
-                  width={barWidth + 4}
-                  height={BAR_HEIGHT + 4}
-                  rx={7}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={2}
-                  opacity={0.4}
-                />
+                <rect x={x - 2} y={y - 2} width={barWidth + 4} height={BAR_HEIGHT + 4} rx={7} fill="none" stroke={color} strokeWidth={2} opacity={0.4} />
               )}
 
-              {/* Bar body */}
               <rect x={x} y={y} width={barWidth} height={BAR_HEIGHT} rx={5} fill={color} opacity={0.85} />
 
-              {/* Progress overlay */}
               {progress > 0 && (
-                <rect
-                  x={x} y={y}
-                  width={barWidth * (progress / 100)}
-                  height={BAR_HEIGHT}
-                  rx={5}
-                  fill={color}
-                  opacity={1}
-                  style={{ pointerEvents: 'none' }}
-                />
+                <rect x={x} y={y} width={barWidth * (progress / 100)} height={BAR_HEIGHT} rx={5} fill={color} opacity={1} style={{ pointerEvents: 'none' }} />
               )}
 
-              {/* Task label */}
-              <text
-                x={x + 8}
-                y={y + BAR_HEIGHT / 2 + 1}
-                dominantBaseline="middle"
-                fontSize={11}
-                fontWeight={500}
-                fill="white"
-                clipPath={`url(#clip-${task.id})`}
-                style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}
-              >
+              <text x={x + 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={500} fill="white" clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                 {task.name}
               </text>
 
-              {/* Hours/day display in day view */}
               {viewMode === 'day' && totalHoursPerDay > 0 && barWidth > 60 && (
-                <text
-                  x={x + barWidth - 8}
-                  y={y + BAR_HEIGHT / 2 + 1}
-                  dominantBaseline="middle"
-                  textAnchor="end"
-                  fontSize={9}
-                  fontWeight={600}
-                  fill="white"
-                  opacity={0.8}
-                  style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}
-                >
+                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill="white" opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                   {totalHoursPerDay}h/d
                 </text>
               )}
 
-              {/* Drag handle for vertical reorder (left edge dot area) */}
-              <rect
-                x={x - 14}
-                y={y + 4}
-                width={12}
-                height={BAR_HEIGHT - 8}
-                fill="transparent"
-                style={{ cursor: 'ns-resize' }}
-                onMouseDown={(e) => handleRowDragStart(e, i)}
-              />
-              {/* Grip dots */}
+              <rect x={x - 14} y={y + 4} width={12} height={BAR_HEIGHT - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
               <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 - 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
               <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 + 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
 
-              {/* Move surface */}
-              <rect
-                x={x + 8}
-                y={y}
-                width={Math.max(barWidth - 16, 4)}
-                height={BAR_HEIGHT}
-                fill="transparent"
-                style={{ cursor: 'grab' }}
+              <rect x={x + 8} y={y} width={Math.max(barWidth - 16, 4)} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'grab' }}
                 onMouseDown={(e) => handleMouseDown(e, task, 'move')}
                 onClick={(e) => { if (!didDragRef.current) onTaskClick?.(task.id, e); }}
               />
 
-              {/* Left resize handle */}
               <rect x={x} y={y} width={8} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'ew-resize' }} onMouseDown={(e) => handleMouseDown(e, task, 'resize-start')} />
-
-              {/* Right resize handle */}
               <rect x={x + barWidth - 8} y={y} width={8} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'ew-resize' }} onMouseDown={(e) => handleMouseDown(e, task, 'resize-end')} />
             </g>
           );
@@ -764,11 +615,7 @@ export default function GanttChart({
       {tooltip && (
         <div
           className="fixed pointer-events-none z-[100] rounded-lg border border-border bg-sidebar px-3 py-2 shadow-xl"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y - 12,
-            transform: 'translate(-50%, -100%)',
-          }}
+          style={{ left: tooltip.x, top: tooltip.y - 12, transform: 'translate(-50%, -100%)' }}
         >
           <div className="text-xs font-semibold text-text leading-tight">{tooltip.task.name}</div>
           <div className="text-[10px] text-text-muted leading-tight mt-0.5">
