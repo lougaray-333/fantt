@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -440,6 +440,24 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
     }, 250);
   };
 
+  const [workbackCopied, setWorkbackCopied] = useState(false);
+  const handleCopyWorkback = useCallback(() => {
+    if (store.tasks.length === 0) return;
+    const fmt = (dateStr) => {
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    };
+    const lines = store.tasks.map((t) => {
+      const s = fmt(t.start);
+      const e = fmt(t.end);
+      return s === e ? `• ${s}: ${t.name}` : `• ${s}-${e}: ${t.name}`;
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setWorkbackCopied(true);
+      setTimeout(() => setWorkbackCopied(false), 2000);
+    });
+  }, [store.tasks]);
+
   if (store.loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
@@ -542,6 +560,18 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             <Library size={14} />
             Library
           </button>
+
+          {/* Workback export */}
+          {store.tasks.length > 0 && (
+            <button
+              onClick={handleCopyWorkback}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+              title="Copy workback schedule to clipboard"
+            >
+              {workbackCopied ? <Check size={13} className="text-green-500" /> : <ClipboardList size={13} />}
+              {workbackCopied ? 'Copied!' : 'Workback'}
+            </button>
+          )}
 
           {/* Save status */}
           <span className="text-[11px] text-text-muted/60">
