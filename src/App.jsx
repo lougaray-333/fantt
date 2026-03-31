@@ -37,7 +37,6 @@ export default function App() {
 
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
-  const [pendingWBSTasks, setPendingWBSTasks] = useState(null);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem(EMAIL_KEY));
   const projectStore = useProjects(email);
 
@@ -65,7 +64,27 @@ export default function App() {
 
   const handleImportWBS = async (tasks, name) => {
     const project = await projectStore.createProject(name);
-    setPendingWBSTasks(tasks);
+    if (isConfigured) {
+      // Insert tasks one-by-one with await to guarantee persistence
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        const { error } = await supabase.from('tasks').insert({
+          id: crypto.randomUUID(),
+          project_id: project.id,
+          name: t.name,
+          start_date: t.start,
+          end_date: t.end,
+          group: t.group || '',
+          progress: t.progress || 0,
+          dependencies: t.dependencies || [],
+          color: t.color || '',
+          sort_order: i,
+          assignees: t.assignees || [],
+          milestone: t.milestone || false,
+        });
+        if (error) console.error('[WBS import] insert error:', error);
+      }
+    }
     setActiveProjectId(project.id);
   };
 
@@ -136,8 +155,6 @@ export default function App() {
         projectName={activeProject?.name || ''}
         email={email}
         onBack={() => setActiveProjectId(null)}
-        pendingWBSTasks={pendingWBSTasks}
-        onWBSConsumed={() => setPendingWBSTasks(null)}
       />
     </Suspense>
   );

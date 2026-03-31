@@ -46,20 +46,8 @@ function shiftAllHours(resourceHours, calendarDelta, refDate) {
   return shifted;
 }
 
-export default function GanttEditor({ projectId, projectName, email, onBack, pendingWBSTasks, onWBSConsumed }) {
+export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const store = useTaskStore(projectId);
-
-  // Import WBS tasks one-by-one using store.addTask (proven to persist)
-  const wbsImportedRef = useRef(false);
-  useEffect(() => {
-    if (wbsImportedRef.current || store.loading || !pendingWBSTasks?.length) return;
-    wbsImportedRef.current = true;
-    for (const t of pendingWBSTasks) {
-      store.addTask(t);
-    }
-    if (onWBSConsumed) onWBSConsumed();
-  }, [store.loading, pendingWBSTasks]);
-
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState('day');
   const [selectedIds, setSelectedIds] = useState(new Set());
