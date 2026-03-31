@@ -36,6 +36,7 @@ export default function App() {
 
   const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY) || '');
   const [activeProjectId, setActiveProjectId] = useState(null);
+  const [pendingImportTasks, setPendingImportTasks] = useState(null);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem(EMAIL_KEY));
   const projectStore = useProjects(email);
 
@@ -60,6 +61,12 @@ export default function App() {
       return false;
     }
   })();
+
+  const handleImportWBS = async (tasks, name) => {
+    const project = await projectStore.createProject(name);
+    setPendingImportTasks(tasks);
+    setActiveProjectId(project.id);
+  };
 
   const handleImportLocal = async () => {
     try {
@@ -111,6 +118,7 @@ export default function App() {
           onRename={projectStore.renameProject}
           onSignOut={handleLogout}
           onImportLocal={handleImportLocal}
+          onImportWBS={handleImportWBS}
           hasLocalData={hasLocalData}
           userEmail={email}
         />
@@ -127,6 +135,8 @@ export default function App() {
         projectName={activeProject?.name || ''}
         email={email}
         onBack={() => setActiveProjectId(null)}
+        initialTasks={pendingImportTasks}
+        onConsumeInitialTasks={() => setPendingImportTasks(null)}
       />
     </Suspense>
   );

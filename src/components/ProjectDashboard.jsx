@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Plus,
   Trash2,
@@ -7,8 +7,11 @@ import {
   Loader2,
   Clock,
   Pencil,
+  ClipboardPaste,
+  X,
 } from 'lucide-react';
 import FanttLogo from './FanttLogo';
+import { parseWBS } from '../utils/parseWBS';
 
 export default function ProjectDashboard({
   projects,
@@ -21,6 +24,7 @@ export default function ProjectDashboard({
   onRename,
   onSignOut,
   onImportLocal,
+  onImportWBS,
   hasLocalData,
   userEmail,
 }) {
@@ -30,6 +34,10 @@ export default function ProjectDashboard({
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [showWBSModal, setShowWBSModal] = useState(false);
+  const [wbsText, setWbsText] = useState('');
+  const [wbsName, setWbsName] = useState('Imported Project');
+  const [wbsCreating, setWbsCreating] = useState(false);
   const newInputRef = useRef(null);
   const editInputRef = useRef(null);
 
@@ -80,6 +88,23 @@ export default function ProjectDashboard({
       day: 'numeric',
       year: 'numeric',
     });
+  };
+
+  const parsedWBSTasks = useMemo(() => parseWBS(wbsText), [wbsText]);
+
+  const handleWBSSubmit = async () => {
+    if (parsedWBSTasks.length === 0 || !onImportWBS) return;
+    setWbsCreating(true);
+    try {
+      await onImportWBS(parsedWBSTasks, wbsName.trim() || 'Imported Project');
+      setShowWBSModal(false);
+      setWbsText('');
+      setWbsName('Imported Project');
+    } catch {
+      // stay on modal
+    } finally {
+      setWbsCreating(false);
+    }
   };
 
   return (
@@ -164,14 +189,24 @@ export default function ProjectDashboard({
               </button>
             </form>
           ) : (
-            <button
-              onClick={() => setNamingNew(true)}
-              disabled={!canCreateMore}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-            >
-              <Plus size={16} />
-              New Project
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowWBSModal(true)}
+                disabled={!canCreateMore}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-text-muted hover:bg-border/50 disabled:opacity-50 transition"
+              >
+                <ClipboardPaste size={16} />
+                Paste WBS
+              </button>
+              <button
+                onClick={() => setNamingNew(true)}
+                disabled={!canCreateMore}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+              >
+                <Plus size={16} />
+                New Project
+              </button>
+            </div>
           )}
         </div>
 
@@ -261,6 +296,71 @@ export default function ProjectDashboard({
           </div>
         )}
       </main>
+
+      {/* WBS Import Modal */}
+      {showWBSModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowWBSModal(false)}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-sidebar p-6 shadow-xl mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-text">Paste Workback Schedule</h3>
+              <button
+                onClick={() => setShowWBSModal(false)}
+                className="rounded-lg p-1 text-text-muted hover:bg-border/50 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="block text-xs font-medium text-text-muted mb-1">
+              Project Name
+            </label>
+            <input
+              type="text"
+              value={wbsName}
+              onChange={(e) => setWbsName(e.target.value)}
+              className="mb-4 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+
+            <label className="block text-xs font-medium text-text-muted mb-1">
+              Paste bulleted schedule
+            </label>
+            <textarea
+              value={wbsText}
+              onChange={(e) => setWbsText(e.target.value)}
+              placeholder={"• 3/15: Kickoff Meeting\n• 3/15-3/22: UX Strategy\n• 3/22-4/5: Design Phase"}
+              rows={8}
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text font-mono focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-y"
+            />
+
+            <p className="mt-2 text-xs text-text-muted">
+              {parsedWBSTasks.length === 0
+                ? 'No tasks found — use format: • M/D-M/D: Task Name'
+                : `${parsedWBSTasks.length} task${parsedWBSTasks.length !== 1 ? 's' : ''} found`}
+            </p>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowWBSModal(false)}
+                className="rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-border/50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleWBSSubmit}
+                disabled={parsedWBSTasks.length === 0 || wbsCreating}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+              >
+                {wbsCreating ? <Loader2 size={14} className="animate-spin" /> : null}
+                Create Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
