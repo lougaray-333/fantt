@@ -65,24 +65,25 @@ export default function App() {
   const handleImportWBS = async (tasks, name) => {
     const project = await projectStore.createProject(name);
     if (isConfigured) {
-      // Insert tasks one-by-one with await to guarantee persistence
-      for (let i = 0; i < tasks.length; i++) {
-        const t = tasks[i];
-        const { error } = await supabase.from('tasks').insert({
-          id: crypto.randomUUID(),
-          project_id: project.id,
-          name: t.name,
-          start_date: t.start,
-          end_date: t.end,
-          group: t.group || '',
-          progress: t.progress || 0,
-          dependencies: t.dependencies || [],
-          color: t.color || '',
-          sort_order: i,
-          assignees: t.assignees || [],
-          milestone: t.milestone || false,
-        });
-        if (error) console.error('[WBS import] insert error:', error);
+      const rows = tasks.map((t, i) => ({
+        id: crypto.randomUUID(),
+        project_id: project.id,
+        name: t.name,
+        start_date: t.start,
+        end_date: t.end,
+        group: t.group || '',
+        progress: t.progress || 0,
+        dependencies: t.dependencies || [],
+        color: t.color || '',
+        sort_order: i,
+        assignees: t.assignees || [],
+        milestone: t.milestone || false,
+      }));
+      const { data, error } = await supabase.from('tasks').insert(rows).select();
+      if (error) {
+        alert('[WBS debug] Insert error: ' + JSON.stringify(error));
+      } else {
+        alert('[WBS debug] Inserted ' + (data?.length || 0) + ' tasks for project ' + project.id);
       }
     }
     setActiveProjectId(project.id);
