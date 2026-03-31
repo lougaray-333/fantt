@@ -5,12 +5,12 @@
  *   • M/D-M/D: Task Name    → date range (normal task)
  *   • M/D: Task Name        → single date (milestone)
  *
- * Bullet prefix can be •, -, or *.
+ * Bullet prefix can be •, -, or * — or omitted entirely.
  * Dates are M/D without year — current year is inferred.
  * If the resolved date is >6 months in the past, it rolls to next year.
  */
 
-const LINE_RE = /^[•\-*]\s*(\d{1,2}\/\d{1,2})(?:\s*[-–]\s*(\d{1,2}\/\d{1,2}))?\s*:\s*(.+)$/;
+const LINE_RE = /^(?:[•\-*]\s*)?(\d{1,2}\/\d{1,2})(?:\s*[-–]\s*(\d{1,2}\/\d{1,2}))?\s*:\s*(.+)$/;
 
 function resolveDate(monthDay) {
   const [month, day] = monthDay.split('/').map(Number);
