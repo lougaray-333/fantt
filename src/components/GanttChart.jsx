@@ -39,6 +39,7 @@ export default function GanttChart({
   const panRef = useRef(null);
   const didDragRef = useRef(false);
   const [tooltip, setTooltip] = useState(null); // { x, y, task }
+  const tooltipRafRef = useRef(null);
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
@@ -168,6 +169,19 @@ export default function GanttChart({
     }
     return labels;
   }, [rangeStart, rangeEnd, totalDays, colWidth, viewMode, todayStr, skipWeekends]);
+
+  // Memoized clipPath defs
+  const clipPathDefs = useMemo(() => {
+    return tasks.filter(t => !t.milestone).map((task) => {
+      const x = dayToX(task.start);
+      const barWidth = Math.max((diffDays(task.start, task.end) + 1) * colWidth, colWidth);
+      return (
+        <clipPath key={`clip-${task.id}`} id={`clip-${task.id}`}>
+          <rect x={x + 6} y={0} width={barWidth - 12} height={bodyHeight + 100} />
+        </clipPath>
+      );
+    });
+  }, [tasks, colWidth, skipWeekends]);
 
   // Horizontal drag (move/resize)
   const handleMouseDown = useCallback(
@@ -436,15 +450,7 @@ export default function GanttChart({
           <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
             <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} />
           </marker>
-          {tasks.map((task) => {
-            const x = dayToX(task.start);
-            const barWidth = Math.max((diffDays(task.start, task.end) + 1) * colWidth, colWidth);
-            return (
-              <clipPath key={`clip-${task.id}`} id={`clip-${task.id}`}>
-                <rect x={x + 6} y={0} width={barWidth - 12} height={bodyHeight + 100} />
-              </clipPath>
-            );
-          })}
+          {clipPathDefs}
         </defs>
 
         {/* Today column highlight */}
@@ -547,6 +553,12 @@ export default function GanttChart({
           const progress = task.progress || 0;
           const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);
 
+          // Milestone diamond geometry
+          const isMilestone = task.milestone;
+          const mx = x + colWidth / 2;
+          const my = i * ROW_HEIGHT + ROW_HEIGHT / 2;
+          const ds = 10; // diamond half-size
+
           let animStyle = {};
           if (animatingTask?.id === task.id) {
             const animMap = {
@@ -558,12 +570,61 @@ export default function GanttChart({
               'bounce-v': 'fantt-bounce-v 0.35s ease-out',
               'pop-in':   'fantt-pop-in 0.4s ease-out',
             };
-            const centerX = x + barWidth / 2;
-            const centerY = y + BAR_HEIGHT / 2;
+            const centerX = isMilestone ? mx : x + barWidth / 2;
+            const centerY = isMilestone ? my : y + BAR_HEIGHT / 2;
             animStyle = {
               animation: animMap[animatingTask.type] || '',
               transformOrigin: `${centerX}px ${centerY}px`,
             };
+          }
+
+          const handleTooltipMove = (e) => {
+            if (!tooltipRafRef.current) {
+              tooltipRafRef.current = requestAnimationFrame(() => {
+                setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                tooltipRafRef.current = null;
+              });
+            }
+          };
+
+          if (isMilestone) {
+            return (
+              <g
+                key={`bar-${task.id}`}
+                style={animStyle}
+                onAnimationEnd={onAnimationEnd}
+                onMouseEnter={(e) => { setTooltip({ x: e.clientX, y: e.clientY, task }); }}
+                onMouseMove={handleTooltipMove}
+                onMouseLeave={() => setTooltip(null)}
+              >
+                {isSelected && (
+                  <polygon
+                    points={`${mx},${my-ds-3} ${mx+ds+3},${my} ${mx},${my+ds+3} ${mx-ds-3},${my}`}
+                    fill="none" stroke={color} strokeWidth={2} opacity={0.4}
+                  />
+                )}
+
+                <polygon
+                  points={`${mx},${my-ds} ${mx+ds},${my} ${mx},${my+ds} ${mx-ds},${my}`}
+                  fill={color} opacity={0.9}
+                />
+
+                <text x={mx + ds + 6} y={my + 1} dominantBaseline="middle" fontSize={11} fontWeight={500} fill="var(--color-text)" style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+                  {task.name}
+                </text>
+
+                {/* Reorder handle */}
+                <rect x={mx - ds - 14} y={my - ds + 4} width={12} height={2 * ds - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
+                <circle cx={mx - ds - 8} cy={my - 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
+                <circle cx={mx - ds - 8} cy={my + 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
+
+                {/* Move handle (covers diamond) — no resize handles */}
+                <rect x={mx - ds} y={my - ds} width={2 * ds} height={2 * ds} fill="transparent" style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleMouseDown(e, task, 'move')}
+                  onClick={(e) => { if (!didDragRef.current) onTaskClick?.(task.id, e); }}
+                />
+              </g>
+            );
           }
 
           return (
@@ -572,7 +633,7 @@ export default function GanttChart({
               style={animStyle}
               onAnimationEnd={onAnimationEnd}
               onMouseEnter={(e) => { setTooltip({ x: e.clientX, y: e.clientY, task }); }}
-              onMouseMove={(e) => { if (tooltip) setTooltip((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null); }}
+              onMouseMove={handleTooltipMove}
               onMouseLeave={() => setTooltip(null)}
             >
               {isSelected && (

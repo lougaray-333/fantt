@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import AuthGate from './components/AuthGate';
-import GanttEditor from './components/GanttEditor';
-import ProjectDashboard from './components/ProjectDashboard';
+const GanttEditor = lazy(() => import('./components/GanttEditor'));
+const ProjectDashboard = lazy(() => import('./components/ProjectDashboard'));
 import { useProjects } from './hooks/useProjects';
 
 // Lazy-load routes that aren't needed on initial render
@@ -99,31 +99,35 @@ export default function App() {
   // Project dashboard
   if (!activeProjectId) {
     return (
-      <ProjectDashboard
-        projects={projectStore.projects}
-        loading={projectStore.loading}
-        canCreateMore={projectStore.canCreateMore}
-        maxProjects={projectStore.maxProjects}
-        onCreate={projectStore.createProject}
-        onOpen={setActiveProjectId}
-        onDelete={projectStore.deleteProject}
-        onRename={projectStore.renameProject}
-        onSignOut={handleLogout}
-        onImportLocal={handleImportLocal}
-        hasLocalData={hasLocalData}
-        userEmail={email}
-      />
+      <Suspense fallback={<LoadingSpinner />}>
+        <ProjectDashboard
+          projects={projectStore.projects}
+          loading={projectStore.loading}
+          canCreateMore={projectStore.canCreateMore}
+          maxProjects={projectStore.maxProjects}
+          onCreate={projectStore.createProject}
+          onOpen={setActiveProjectId}
+          onDelete={projectStore.deleteProject}
+          onRename={projectStore.renameProject}
+          onSignOut={handleLogout}
+          onImportLocal={handleImportLocal}
+          hasLocalData={hasLocalData}
+          userEmail={email}
+        />
+      </Suspense>
     );
   }
 
   // Gantt editor
   const activeProject = projectStore.projects.find(p => p.id === activeProjectId);
   return (
-    <GanttEditor
-      projectId={activeProjectId}
-      projectName={activeProject?.name || ''}
-      email={email}
-      onBack={() => setActiveProjectId(null)}
-    />
+    <Suspense fallback={<LoadingSpinner />}>
+      <GanttEditor
+        projectId={activeProjectId}
+        projectName={activeProject?.name || ''}
+        email={email}
+        onBack={() => setActiveProjectId(null)}
+      />
+    </Suspense>
   );
 }

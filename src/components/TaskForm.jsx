@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Trash2, Check } from 'lucide-react';
+import { Plus, X, Trash2, Check, Diamond } from 'lucide-react';
 import { formatDate } from '../utils/dates';
 import { PRESET_COLORS } from '../utils/colors';
 
@@ -20,6 +20,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
     dependencies: [],
     color: '',
     assignees: [],
+    milestone: false,
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -38,6 +39,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
         dependencies: editingTask.dependencies || [],
         color,
         assignees: editingTask.assignees || [],
+        milestone: editingTask.milestone || false,
       });
       // If color is custom (not in presets), show it in hex input
       if (color && !PRESET_COLORS.some((p) => p.hex === color)) {
@@ -119,27 +121,29 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${form.milestone ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <div>
           <label className="mb-1 block text-xs font-medium text-text-muted">Start</label>
           <input
             type="date"
             value={form.start}
-            onChange={(e) => setForm({ ...form, start: e.target.value })}
+            onChange={(e) => setForm({ ...form, start: e.target.value, ...(form.milestone ? { end: e.target.value } : {}) })}
             required
             className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-text-muted">End</label>
-          <input
-            type="date"
-            value={form.end}
-            onChange={(e) => setForm({ ...form, end: e.target.value })}
-            required
-            className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
-          />
-        </div>
+        {!form.milestone && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-muted">End</label>
+            <input
+              type="date"
+              value={form.end}
+              onChange={(e) => setForm({ ...form, end: e.target.value })}
+              required
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm focus:border-accent focus:outline-none"
+            />
+          </div>
+        )}
       </div>
 
       {/* Color picker */}
@@ -203,6 +207,28 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
           onChange={(e) => setForm({ ...form, progress: Number(e.target.value) })}
           className="w-full accent-accent"
         />
+      </div>
+
+      {/* Milestone toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const next = !form.milestone;
+            setForm({ ...form, milestone: next, ...(next ? { end: form.start, progress: 0 } : {}) });
+          }}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            form.milestone
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-border text-text-muted hover:border-accent/40'
+          }`}
+        >
+          <Diamond size={12} />
+          Milestone
+        </button>
+        {form.milestone && (
+          <span className="text-[10px] text-text-muted">Single-day marker (no duration)</span>
+        )}
       </div>
 
       {/* Assignees */}

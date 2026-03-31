@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { Trash2, Diamond } from 'lucide-react';
 import { formatShortDate } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 import { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
@@ -51,7 +51,8 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
               />
               {/* Task info */}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium text-text leading-tight">
+                <div className="truncate text-xs font-medium text-text leading-tight flex items-center gap-1">
+                  {task.milestone && <Diamond size={10} className="shrink-0 text-text-muted" />}
                   {task.name}
                 </div>
                 <div className="truncate text-[10px] text-text-muted leading-tight">
