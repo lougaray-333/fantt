@@ -210,7 +210,7 @@ export default memo(function ResourceGrid({
     return null;
   }, [resourceHours]);
 
-  const gridWidth = totalDays * colWidth;
+  const gridWidth = dates.length * colWidth;
   const totalWidth = ROLE_COL_WIDTH + gridWidth;
 
   const colHighlight = (dateStr) =>
