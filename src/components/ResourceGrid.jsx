@@ -76,6 +76,7 @@ export default memo(function ResourceGrid({
   // Compute totals
   const totals = useMemo(() => {
     let grandTotal = 0;
+    let grandHours = 0;
     const hoursPerDay = {};
     const costPerDay = {};
     for (const entry of RATE_CARD) {
@@ -87,13 +88,14 @@ export default memo(function ResourceGrid({
           const dayCost = hours * entry.rate;
           costPerDay[dateStr] = (costPerDay[dateStr] || 0) + dayCost;
           grandTotal += dayCost;
+          grandHours += hours;
         }
       }
     }
     for (const oop of (oopExpenses || [])) {
       if ((oop.amount || 0) > 0) grandTotal += oop.amount;
     }
-    return { hoursPerDay, costPerDay, grandTotal };
+    return { hoursPerDay, costPerDay, grandTotal, grandHours };
   }, [resourceHours, oopExpenses, hiddenSet]);
 
   const formatCurrency = (n) =>
@@ -607,17 +609,18 @@ export default memo(function ResourceGrid({
             </div>
           </div>
 
-          {/* Frozen bottom: Hours/Day + Total Budget */}
+          {/* Frozen bottom: Total Hours + Total Budget */}
           <div className="flex border-t-2 border-border shrink-0">
             <div
               className="shrink-0 border-r border-border bg-sidebar z-10"
               style={{ width: ROLE_COL_WIDTH }}
             >
               <div className="flex items-center justify-between px-3 border-b border-border/50" style={{ height: ROW_H }}>
-                <span className="text-[11px] font-semibold text-text">Hours / Day</span>
+                <span className="text-[11px] font-bold text-accent">Total Hours</span>
+                <span className="text-[11px] font-bold text-accent font-mono">{totals.grandHours.toLocaleString()}h</span>
               </div>
               <div className="flex items-center justify-between px-3" style={{ height: ROW_H }}>
-                <span className="text-[11px] font-bold text-text">Total Budget</span>
+                <span className="text-[11px] font-bold text-accent">Total Budget</span>
                 <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(totals.grandTotal)}</span>
               </div>
             </div>
@@ -634,7 +637,7 @@ export default memo(function ResourceGrid({
                           ${colHighlight(d.str)}`}
                         style={{ width: colWidth, height: ROW_H }}
                       >
-                        <span className={`text-[10px] font-semibold font-mono ${dayHours > 0 ? 'text-text' : 'text-text-muted/30'}`}>
+                        <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-accent' : 'text-text-muted/30'}`}>
                           {dayHours > 0 ? dayHours : ''}
                         </span>
                       </div>
