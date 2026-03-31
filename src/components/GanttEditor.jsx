@@ -679,6 +679,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               tasks={store.tasks}
               viewMode={viewMode}
               hideWeekends={hideWeekends}
+              ganttScrollRef={ganttScrollRef}
               resourceHours={resourceHours}
               onHoursChange={handleResourceHoursChange}
               onQuickFill={handleQuickFill}

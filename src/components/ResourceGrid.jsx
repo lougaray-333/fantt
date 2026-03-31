@@ -43,6 +43,7 @@ export default memo(function ResourceGrid({
   collapsed,
   onToggle,
   resourceScrollRef,
+  ganttScrollRef,
   highlightedDate,
   onDateClick,
 }) {
@@ -162,6 +163,24 @@ export default memo(function ResourceGrid({
     return () => document.removeEventListener('mousedown', handler);
   }, [addRoleOpen]);
 
+  // Forward horizontal wheel/trackpad scroll to the Gantt chart
+  const wrapperRef = useRef(null);
+  useEffect(() => {
+    const el = wrapperRef.current;
+    const gantt = ganttScrollRef?.current;
+    if (!el || !gantt) return;
+    const handler = (e) => {
+      // deltaX for trackpad horizontal swipe, or shift+wheel
+      const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+      if (dx) {
+        e.preventDefault();
+        gantt.scrollLeft += dx;
+      }
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [ganttScrollRef]);
+
   // Sync frozen bottom rows horizontally with main grid
   const bottomScrollRef = useRef(null);
   useEffect(() => {
@@ -219,7 +238,7 @@ export default memo(function ResourceGrid({
   );
 
   return (
-    <div className="shrink-0 border-t border-border bg-sidebar flex flex-col relative z-10">
+    <div ref={wrapperRef} className="shrink-0 border-t border-border bg-sidebar flex flex-col relative z-10">
       {/* Collapse bar */}
       <div className="flex w-full items-center gap-2 px-4 py-2 shrink-0 relative">
         <button
