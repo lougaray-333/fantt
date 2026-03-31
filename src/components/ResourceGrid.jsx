@@ -619,6 +619,16 @@ export default memo(function ResourceGrid({
                 <span className="text-[11px] font-bold text-accent">Total Hours</span>
                 <span className="text-[11px] font-bold text-accent font-mono">{totals.grandHours.toLocaleString()}h</span>
               </div>
+              {(() => {
+                const oopTotal = (oopExpenses || []).reduce((s, o) => s + (o.amount || 0), 0);
+                if (oopTotal <= 0) return null;
+                return (
+                  <div className="flex items-center justify-between px-3 border-b border-border/50" style={{ height: ROW_H }}>
+                    <span className="text-[11px] font-bold text-accent">Total OOP</span>
+                    <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(oopTotal)}</span>
+                  </div>
+                );
+              })()}
               <div className="flex items-center justify-between px-3" style={{ height: ROW_H }}>
                 <span className="text-[11px] font-bold text-accent">Total Budget</span>
                 <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(totals.grandTotal)}</span>
