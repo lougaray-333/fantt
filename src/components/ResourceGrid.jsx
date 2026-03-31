@@ -73,6 +73,20 @@ export default memo(function ResourceGrid({
     return arr;
   }, [rangeStart, totalDays, skipWeekends]);
 
+  // Dates covered by at least one task
+  const coveredDates = useMemo(() => {
+    const set = new Set();
+    for (const task of tasks) {
+      let cursor = new Date(task.start + 'T00:00:00');
+      const end = new Date(task.end + 'T00:00:00');
+      while (cursor <= end) {
+        set.add(formatDate(cursor));
+        cursor = addDays(cursor, 1);
+      }
+    }
+    return set;
+  }, [tasks]);
+
   // Compute totals
   const totals = useMemo(() => {
     let grandTotal = 0;
@@ -471,13 +485,15 @@ export default memo(function ResourceGrid({
                           </RoleCell>
                           {dates.map((d) => {
                             const hours = roleData[d.str] || 0;
+                            const orphaned = hours > 0 && !coveredDates.has(d.str);
                             return (
                               <div
                                 key={d.str}
                                 className={`shrink-0 border-r border-border/20 flex items-center justify-center
-                                  ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
+                                  ${orphaned ? 'bg-red-500/10' : d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
                                   ${colHighlight(d.str)}`}
                                 style={{ width: colWidth, height: ROW_H }}
+                                title={orphaned ? 'No activity on this date' : undefined}
                               >
                                 <input
                                   type="number"
@@ -485,9 +501,10 @@ export default memo(function ResourceGrid({
                                   max="24"
                                   value={hours || ''}
                                   onChange={(e) => handleInputChange(entry.role, d.str, e.target.value)}
-                                  className="w-full h-full bg-transparent text-center text-[10px] font-mono text-text
+                                  className={`w-full h-full bg-transparent text-center text-[10px] font-mono
                                     focus:bg-accent/10 focus:outline-none focus:ring-1 focus:ring-accent/30
-                                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+                                    ${orphaned ? 'text-red-400' : 'text-text'}`}
                                   style={{ width: colWidth }}
                                 />
                               </div>
