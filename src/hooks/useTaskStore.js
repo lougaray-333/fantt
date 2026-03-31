@@ -33,7 +33,7 @@ function rowToTask(row) {
     color: row.color || '',
     sortOrder: row.sort_order ?? 0,
     assignees: row.assignees || [],
-    milestone: row.milestone || false,
+    milestone: row.start_date === row.end_date,
   };
 }
 
@@ -51,7 +51,6 @@ function taskToRow(task, projectId) {
     color: task.color || '',
     sort_order: task.sortOrder ?? 0,
     assignees: task.assignees || [],
-    milestone: task.milestone || false,
   };
 }
 
@@ -180,7 +179,6 @@ export function useTaskStore(projectId) {
       if (updates.color !== undefined) row.color = updates.color;
       if (updates.sortOrder !== undefined) row.sort_order = updates.sortOrder;
       if (updates.assignees !== undefined) row.assignees = updates.assignees;
-      if (updates.milestone !== undefined) row.milestone = updates.milestone;
 
       if (Object.keys(row).length > 0) {
         markSaving();

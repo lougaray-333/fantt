@@ -77,14 +77,8 @@ export default function App() {
         color: t.color || '',
         sort_order: i,
         assignees: t.assignees || [],
-        milestone: t.milestone || false,
       }));
-      const { data, error } = await supabase.from('tasks').insert(rows).select();
-      if (error) {
-        alert('[WBS debug] Insert error: ' + JSON.stringify(error));
-      } else {
-        alert('[WBS debug] Inserted ' + (data?.length || 0) + ' tasks for project ' + project.id);
-      }
+      await supabase.from('tasks').insert(rows).select();
     }
     setActiveProjectId(project.id);
   };
