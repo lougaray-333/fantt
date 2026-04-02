@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList, Share2 } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -12,6 +12,7 @@ import ViewModeToggle from './ViewModeToggle';
 const ActivityLibrary = lazy(() => import('./ActivityLibrary'));
 const BugReportButton = lazy(() => import('./BugReportButton'));
 import ResourceGrid from './ResourceGrid';
+import SharePanel from './SharePanel';
 import { useHistory } from '../hooks/useHistory';
 import { supabase, isConfigured } from '../lib/supabase';
 
@@ -53,6 +54,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formClosing, setFormClosing] = useState(false);
   const [animatingTask, setAnimatingTask] = useState(null);
@@ -561,6 +563,16 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             Library
           </button>
 
+          {/* Share */}
+          <button
+            onClick={() => setSharePanelOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+            title="Share project"
+          >
+            <Share2 size={13} />
+            Share
+          </button>
+
           {/* Workback export */}
           {store.tasks.length > 0 && (
             <button
@@ -594,11 +606,10 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+            className="rounded-lg border border-border p-1.5 text-text-muted hover:bg-bg-alt transition"
             title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Dark mode'}
           >
             {theme === 'fantasy' ? <Sun size={14} /> : <Moon size={14} />}
-            {theme === 'fantasy' ? 'Light' : 'Dark'}
           </button>
         </div>
       </div>
@@ -729,6 +740,27 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               onDateClick={setHighlightedDate}
             />
         </div>
+      )}
+
+      {/* Share panel */}
+      {sharePanelOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setSharePanelOpen(false)}
+            style={{ animation: 'fantt-backdrop-in 0.25s ease-out forwards' }}
+          />
+          <div
+            className="fixed right-0 top-0 z-50 flex h-full w-96 flex-col border-l border-border bg-sidebar shadow-xl"
+            style={{ animation: 'fantt-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+          >
+            <SharePanel
+              projectId={projectId}
+              projectName={projectName}
+              onClose={() => setSharePanelOpen(false)}
+            />
+          </div>
+        </>
       )}
 
       {/* Slide-over TaskForm panel */}
