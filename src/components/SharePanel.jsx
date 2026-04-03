@@ -30,7 +30,7 @@ export default function SharePanel({ projectId, projectName, onClose }) {
   }, [projectId]);
 
   const shareUrl = shareToken
-    ? `${window.location.origin}/share/${shareToken}`
+    ? `${window.location.origin}/#/share/${shareToken}`
     : null;
 
   async function handleToggleEnable() {

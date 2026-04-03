@@ -8,6 +8,7 @@ import { supabase, isConfigured } from './lib/supabase';
 // Lazy-load routes that aren't needed on initial render
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const GodMode = lazy(() => import('./components/GodMode'));
+const SharedView = lazy(() => import('./components/SharedView'));
 
 const EMAIL_KEY = 'fantt-user-email';
 const STORAGE_KEY = 'gantt-v2-tasks';
@@ -94,6 +95,16 @@ export default function App() {
       // stay on dashboard
     }
   };
+
+  // Public shared project view (no auth required)
+  if (hash.startsWith('#/share/')) {
+    const token = hash.replace('#/share/', '');
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <SharedView token={token} />
+      </Suspense>
+    );
+  }
 
   // God Mode admin dashboard
   if (hash === '#/godmode') {
