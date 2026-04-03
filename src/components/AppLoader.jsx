@@ -34,7 +34,7 @@ export default function AppLoader({ onComplete }) {
         style={{
           animation: 'fantt-loader-text-in 0.6s ease-out 0.5s forwards',
           opacity: 0,
-          fontFamily: 'Inter, sans-serif',
+          fontFamily: 'Montserrat, sans-serif',
           fontWeight: 300,
           fontSize: '13px',
           letterSpacing: '0.18em',
