@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList, Share2 } from 'lucide-react';
-import FanttLogo from './FanttLogo';
+import FantasyLogo from './FantasyLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
 import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
@@ -485,9 +485,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
           )}
 
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <FanttLogo size={20} color="#E52222" />
-            <span className="text-xs font-light tracking-[0.2em] uppercase text-text">Fantt</span>
+          <div className="flex items-center">
+            <FantasyLogo height={18} color="var(--color-text)" />
           </div>
 
           {/* View mode */}

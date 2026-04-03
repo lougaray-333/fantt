@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import FanttLogo from './FanttLogo';
+import FantasyLogo from './FantasyLogo';
 
 function FadeIn({ children, className = '', delay = 0 }) {
   const ref = useRef(null);
@@ -49,9 +49,8 @@ export default function LandingPage({ onGetStarted }) {
 
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5">
-        <div className="flex items-center gap-2.5">
-          <FanttLogo size={22} color="#E52222" />
-          <span className="text-sm font-light tracking-[0.2em] uppercase text-white/70">Fantt</span>
+        <div className="flex items-center">
+          <FantasyLogo height={18} color="rgba(255,255,255,0.7)" />
         </div>
         <button
           onClick={onGetStarted}
@@ -128,9 +127,8 @@ export default function LandingPage({ onGetStarted }) {
       {/* Footer */}
       <footer className="mx-8 border-t border-white/[0.08] px-0 py-8 md:mx-16 lg:mx-24">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FanttLogo size={16} color="#E52222" />
-            <span className="text-xs font-light tracking-[0.15em] uppercase text-white/25">Fantt</span>
+          <div className="flex items-center">
+            <FantasyLogo height={13} color="rgba(255,255,255,0.25)" />
           </div>
           <p className="text-xs text-white/20">A Fantasy product</p>
         </div>

@@ -10,7 +10,7 @@ import {
   ClipboardPaste,
   X,
 } from 'lucide-react';
-import FanttLogo from './FanttLogo';
+import FantasyLogo from './FantasyLogo';
 import { parseWBS } from '../utils/parseWBS';
 
 export default function ProjectDashboard({
@@ -112,9 +112,8 @@ export default function ProjectDashboard({
       {/* Header */}
       <header className="border-b border-border bg-sidebar">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <FanttLogo size={22} color="#E52222" />
-            <span className="text-sm font-light tracking-[0.2em] uppercase text-text">Fantt</span>
+          <div className="flex items-center">
+            <FantasyLogo height={20} color="var(--color-text)" />
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-muted">{userEmail}</span>

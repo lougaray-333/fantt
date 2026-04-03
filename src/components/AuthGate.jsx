@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import FanttLogo from './FanttLogo';
+import FantasyLogo from './FantasyLogo';
 
 export default function AuthGate({ onEnter }) {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ export default function AuthGate({ onEnter }) {
       {/* Logo */}
       <div className="mb-10 flex flex-col items-center gap-3">
         <FanttLogo size={44} color="#E52222" />
-        <span className="text-xs font-light tracking-[0.3em] uppercase text-white/40">Fantt</span>
+        <FantasyLogo height={14} color="rgba(255,255,255,0.4)" />
       </div>
 
       {/* Form */}
