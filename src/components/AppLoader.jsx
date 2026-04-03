@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import FanttLogo from './FanttLogo';
-import FantasyLogo from './FantasyLogo';
 
 export default function AppLoader({ onComplete }) {
   const [fading, setFading] = useState(false);
@@ -31,13 +30,18 @@ export default function AppLoader({ onComplete }) {
         <FanttLogo size={52} color="#E52222" />
       </div>
       <div
+        className="mt-5"
         style={{
           animation: 'fantt-loader-text-in 0.6s ease-out 0.5s forwards',
           opacity: 0,
-          marginTop: '20px',
+          fontFamily: 'Inter, sans-serif',
+          fontWeight: 300,
+          fontSize: '13px',
+          letterSpacing: '0.18em',
+          color: 'rgba(255,255,255,0.45)',
         }}
       >
-        <FantasyLogo height={16} color="rgba(255,255,255,0.5)" />
+        Fantasy
       </div>
     </div>
   );
