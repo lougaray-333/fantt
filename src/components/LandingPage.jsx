@@ -1,28 +1,23 @@
 import { useEffect, useRef } from 'react';
-import { BarChart2, List, Users, Save } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 
-function FadeInSection({ children, className = '' }) {
+function FadeIn({ children, className = '', delay = 0 }) {
   const ref = useRef(null);
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          el.style.animation = 'fantt-fade-in-up 0.6s ease-out forwards';
+          el.style.animation = `fantt-fade-in-up 0.7s cubic-bezier(0.16,1,0.3,1) ${delay}ms forwards`;
           observer.unobserve(el);
         }
       },
       { threshold: 0.1 }
     );
-
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
+  }, [delay]);
   return (
     <div ref={ref} className={className} style={{ opacity: 0 }}>
       {children}
@@ -32,124 +27,115 @@ function FadeInSection({ children, className = '' }) {
 
 const FEATURES = [
   {
-    icon: BarChart2,
-    title: 'Gantt Chart View',
-    description: 'Drag, resize, and connect tasks with dependencies. See your project timeline at a glance.',
+    num: '01',
+    title: 'Timeline',
+    description: 'Visual Gantt charts with drag-and-drop scheduling, task dependencies, and milestone tracking.',
   },
   {
-    icon: List,
-    title: 'List View',
-    description: 'Asana-style inline editing. Group tasks by phase, double-click to edit, track hours.',
+    num: '02',
+    title: 'Resources',
+    description: 'Budget grids, rate cards, and out-of-pocket expense tracking synced to your timeline.',
   },
   {
-    icon: Users,
-    title: 'Collaboration',
-    description: 'Assign team members with per-person hours/day. Track effort across your project.',
+    num: '03',
+    title: 'Share',
+    description: 'Live client-facing links with view-only Gantt access. No login required for stakeholders.',
   },
-  {
-    icon: Save,
-    title: 'Auto-save',
-    description: 'Real-time persistence to the cloud. Never lose your work — everything saves automatically.',
-  },
-];
-
-const STEPS = [
-  { num: '1', title: 'Enter your email', description: 'Quick sign-in with just your email address.' },
-  { num: '2', title: 'Create a project', description: 'Name your project and start building your timeline.' },
-  { num: '3', title: 'Start planning', description: 'Add tasks, assign people, and visualize your schedule.' },
 ];
 
 export default function LandingPage({ onGetStarted }) {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-black text-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Nav */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5">
+        <div className="flex items-center gap-2.5">
+          <FanttLogo size={22} color="#E52222" />
+          <span className="text-sm font-light tracking-[0.2em] uppercase text-white/70">Fantt</span>
+        </div>
+        <button
+          onClick={onGetStarted}
+          className="rounded-full border border-white/20 px-5 py-2 text-xs font-medium text-white/60 tracking-wide hover:border-white/50 hover:text-white transition-all"
+        >
+          Get Started
+        </button>
+      </nav>
+
       {/* Hero */}
-      <section className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        <FadeInSection>
-          <div className="mb-6 flex items-center justify-center gap-3">
-            <FanttLogo size={48} />
-            <h1 className="text-5xl font-bold tracking-tight">
-              Fantt
-            </h1>
-          </div>
-          <p className="mx-auto max-w-lg text-xl text-white/60">
-            Plan your projects with style
+      <section className="flex min-h-screen flex-col justify-end px-8 pb-20 pt-32 md:px-16 lg:px-24">
+        <FadeIn delay={0}>
+          <p className="mb-6 text-xs font-medium tracking-[0.3em] uppercase text-white/30">
+            Project Planning
           </p>
-          <p className="mx-auto mt-3 max-w-md text-sm text-white/40">
-            Beautiful Gantt charts, list views, and team collaboration — all in one place.
+        </FadeIn>
+        <FadeIn delay={80}>
+          <h1 className="max-w-4xl text-[clamp(3rem,8vw,7rem)] font-black leading-[0.92] tracking-tight text-white">
+            Plan with<br />
+            <span style={{ color: '#E52222' }}>Clarity.</span>
+          </h1>
+        </FadeIn>
+        <FadeIn delay={160} className="mt-10 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+          <p className="max-w-sm text-base font-light leading-relaxed text-white/40">
+            Gantt charts, resource grids, and workback schedules — purpose-built for project teams at Fantasy.
           </p>
           <button
             onClick={onGetStarted}
-            className="mt-8 rounded-xl bg-[#ba9634] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#ba9634]/20 hover:bg-[#d4aa3c] transition-all hover:shadow-xl hover:shadow-[#ba9634]/30"
+            className="shrink-0 self-start rounded-full border border-white/25 px-8 py-3.5 text-sm font-medium text-white hover:bg-white hover:text-black transition-all duration-300"
           >
-            Get Started
+            Get Started →
           </button>
-        </FadeInSection>
+        </FadeIn>
       </section>
+
+      {/* Divider */}
+      <div className="mx-8 border-t border-white/[0.08] md:mx-16 lg:mx-24" />
 
       {/* Features */}
-      <section className="px-6 py-24">
-        <div className="mx-auto max-w-4xl">
-          <FadeInSection className="mb-12 text-center">
-            <h2 className="text-3xl font-bold">Everything you need</h2>
-            <p className="mt-2 text-white/50">Powerful project planning, beautifully simple.</p>
-          </FadeInSection>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {FEATURES.map((f, i) => (
-              <FadeInSection key={i}>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 hover:border-[#ba9634]/30 transition">
-                  <f.icon size={24} className="text-[#ba9634]" />
-                  <h3 className="mt-3 text-lg font-semibold">{f.title}</h3>
-                  <p className="mt-1.5 text-sm text-white/50">{f.description}</p>
-                </div>
-              </FadeInSection>
-            ))}
-          </div>
+      <section className="px-8 py-24 md:px-16 lg:px-24">
+        <div className="grid grid-cols-1 gap-0 sm:grid-cols-3">
+          {FEATURES.map((f, i) => (
+            <FadeIn key={i} delay={i * 80}>
+              <div className={`py-10 pr-12 ${i > 0 ? 'sm:border-l border-white/[0.08] sm:pl-12' : ''}`}>
+                <p className="mb-4 text-xs font-medium tracking-[0.3em] uppercase text-white/25">{f.num}</p>
+                <h3 className="mb-3 text-xl font-bold text-white">{f.title}</h3>
+                <p className="text-sm font-light leading-relaxed text-white/40">{f.description}</p>
+              </div>
+            </FadeIn>
+          ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="px-6 py-24">
-        <div className="mx-auto max-w-3xl">
-          <FadeInSection className="mb-12 text-center">
-            <h2 className="text-3xl font-bold">How it works</h2>
-            <p className="mt-2 text-white/50">Three steps to your first project.</p>
-          </FadeInSection>
+      {/* Divider */}
+      <div className="mx-8 border-t border-white/[0.08] md:mx-16 lg:mx-24" />
 
-          <div className="flex flex-col gap-8 sm:flex-row sm:gap-6">
-            {STEPS.map((s, i) => (
-              <FadeInSection key={i} className="flex-1">
-                <div className="text-center">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#ba9634]/20 text-sm font-bold text-[#ba9634]">
-                    {s.num}
-                  </div>
-                  <h3 className="mt-3 text-base font-semibold">{s.title}</h3>
-                  <p className="mt-1 text-sm text-white/50">{s.description}</p>
-                </div>
-              </FadeInSection>
-            ))}
+      {/* CTA */}
+      <section className="px-8 py-24 md:px-16 lg:px-24">
+        <FadeIn>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-3xl font-black tracking-tight text-white">
+              Ready to start?
+            </h2>
+            <button
+              onClick={onGetStarted}
+              className="shrink-0 self-start rounded-full bg-[#E52222] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#cc1a1a] transition-all"
+            >
+              Get Started →
+            </button>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Footer */}
-      <section className="px-6 py-24 text-center">
-        <FadeInSection>
-          <h2 className="text-3xl font-bold">Ready to plan?</h2>
-          <p className="mt-2 text-white/50">Start building your project timeline today.</p>
-          <button
-            onClick={onGetStarted}
-            className="mt-6 rounded-xl bg-[#ba9634] px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#ba9634]/20 hover:bg-[#d4aa3c] transition-all hover:shadow-xl hover:shadow-[#ba9634]/30"
-          >
-            Get Started
-          </button>
-        </FadeInSection>
+        </FadeIn>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 px-6 py-6 text-center text-xs text-white/30">
-        Fantt — Project planning with style
+      <footer className="mx-8 border-t border-white/[0.08] px-0 py-8 md:mx-16 lg:mx-24">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FanttLogo size={16} color="#E52222" />
+            <span className="text-xs font-light tracking-[0.15em] uppercase text-white/25">Fantt</span>
+          </div>
+          <p className="text-xs text-white/20">A Fantasy product</p>
+        </div>
       </footer>
+
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import AuthGate from './components/AuthGate';
+import AppLoader from './components/AppLoader';
 const GanttEditor = lazy(() => import('./components/GanttEditor'));
 const ProjectDashboard = lazy(() => import('./components/ProjectDashboard'));
 import { useProjects } from './hooks/useProjects';
@@ -15,13 +16,14 @@ const STORAGE_KEY = 'gantt-v2-tasks';
 
 function LoadingSpinner() {
   return (
-    <div className="flex h-screen items-center justify-center bg-bg">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-amber-400" />
+    <div className="flex h-screen items-center justify-center bg-black">
+      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-[#E52222]" />
     </div>
   );
 }
 
 export default function App() {
+  const [loaderDone, setLoaderDone] = useState(false);
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {
     const onHash = () => setHash(window.location.hash);
@@ -95,6 +97,12 @@ export default function App() {
       // stay on dashboard
     }
   };
+
+  // Skip loader for shared/godmode routes — show it only for main app
+  const isSpecialRoute = hash.startsWith('#/share/') || hash === '#/godmode';
+  if (!loaderDone && !isSpecialRoute) {
+    return <AppLoader onComplete={() => setLoaderDone(true)} />;
+  }
 
   // Public shared project view (no auth required)
   if (hash.startsWith('#/share/')) {

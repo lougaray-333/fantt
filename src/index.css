@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #ffffff;
-  --color-bg-alt: #f8fafc;
+  --color-bg: #fafafa;
+  --color-bg-alt: #f4f4f4;
   --color-sidebar: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
-  --color-accent: #3b82f6;
-  --color-accent-light: #dbeafe;
-  --color-bar-default: #3b82f6;
-  --color-today: #ef4444;
-  --color-weekend: #f8fafc;
-  --color-grid: #f1f5f9;
-  --color-logo-start: #e63946;
-  --color-logo-end: #d62828;
+  --color-border: #e5e5e5;
+  --color-text: #111111;
+  --color-text-muted: #888888;
+  --color-accent: #E52222;
+  --color-accent-light: rgba(229, 34, 34, 0.1);
+  --color-bar-default: #E52222;
+  --color-today: #E52222;
+  --color-weekend: #f7f7f7;
+  --color-grid: #f0f0f0;
+  --color-logo-start: #E52222;
+  --color-logo-end: #C41A1A;
   --font-sans: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
 /* Fantasy dark theme */
 [data-theme="fantasy"] {
-  --color-bg: #0a0a0a;
-  --color-bg-alt: #121210;
-  --color-sidebar: #080808;
-  --color-border: #2a2520;
+  --color-bg: #000000;
+  --color-bg-alt: #0d0d0d;
+  --color-sidebar: #0a0a0a;
+  --color-border: #1a1a1a;
   --color-text: #ffffff;
-  --color-text-muted: rgba(255, 255, 255, 0.6);
-  --color-accent: #ba9634;
-  --color-accent-light: rgba(186, 150, 52, 0.15);
-  --color-bar-default: #ba9634;
-  --color-today: #ef4444;
-  --color-weekend: #0e0d0b;
-  --color-grid: #1a1814;
-  --color-logo-start: #e63946;
-  --color-logo-end: #d62828;
+  --color-text-muted: rgba(255, 255, 255, 0.45);
+  --color-accent: #E52222;
+  --color-accent-light: rgba(229, 34, 34, 0.12);
+  --color-bar-default: #E52222;
+  --color-today: #E52222;
+  --color-weekend: #050505;
+  --color-grid: #080808;
+  --color-logo-start: #E52222;
+  --color-logo-end: #C41A1A;
 }
 
 body {
@@ -158,4 +158,15 @@ body {
   0% { transform: scale(0.3); opacity: 0; }
   50% { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* App loader — Fantasy mark entrance */
+@keyframes fantt-loader-mark-in {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes fantt-loader-text-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 0.55; transform: translateY(0); }
 }
