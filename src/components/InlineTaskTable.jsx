@@ -30,7 +30,7 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
 
       {/* Task rows */}
       <div>
-        {tasks.map((task) => {
+        {tasks.map((task, index) => {
           const isSelected = selectedIds?.has(task.id);
           const color = getTaskColor(task, groups);
           return (
@@ -42,7 +42,11 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
                   ? 'bg-accent-light'
                   : 'hover:bg-bg-alt'
               }`}
-              style={{ height: ROW_HEIGHT }}
+              style={{
+                height: ROW_HEIGHT,
+                animation: 'fantt-item-in 0.25s ease-out both',
+                animationDelay: `${Math.min(index, 8) * 30}ms`,
+              }}
             >
               {/* Color dot */}
               <div

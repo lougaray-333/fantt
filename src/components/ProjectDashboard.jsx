@@ -232,13 +232,17 @@ export default function ProjectDashboard({
         ) : (
           /* Project grid */
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+            {projects.map((project, index) => (
               <div
                 key={project.id}
                 onClick={() => {
                   if (editingId !== project.id) onOpen(project.id);
                 }}
                 className="group cursor-pointer rounded-xl border border-border bg-sidebar p-4 hover:border-accent/40 hover:shadow-sm transition"
+                style={{
+                  animation: 'fantt-item-in 0.3s ease-out both',
+                  animationDelay: `${Math.min(index, 5) * 60}ms`,
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
