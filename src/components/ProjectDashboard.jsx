@@ -113,7 +113,7 @@ export default function ProjectDashboard({
       <header className="border-b border-border bg-sidebar">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex flex-col leading-none gap-0.5">
-            <span className="text-sm font-bold tracking-tight text-text">Fantt</span>
+            <span className="text-sm font-bold tracking-tight text-text">Fantt Chart</span>
             <div className="flex items-center gap-1">
               <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
               <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>
@@ -142,7 +142,7 @@ export default function ProjectDashboard({
                 Found local project data
               </p>
               <p className="text-xs text-text-muted">
-                Import your existing tasks as a new Fantt chart
+                Import your existing tasks as a new Fantt Chart
               </p>
             </div>
             <button
@@ -226,7 +226,7 @@ export default function ProjectDashboard({
               No projects yet
             </h3>
             <p className="mt-1 text-sm text-text-muted/70">
-              Create your first Fantt chart to get started
+              Create your first Fantt Chart to get started
             </p>
           </div>
         ) : (

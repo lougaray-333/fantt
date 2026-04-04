@@ -486,7 +486,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
 
           {/* Logo */}
           <div className="flex flex-col leading-none gap-0.5">
-            <span className="text-sm font-bold tracking-tight text-text">Fantt</span>
+            <span className="text-sm font-bold tracking-tight text-text">Fantt Chart</span>
             <div className="flex items-center gap-1">
               <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
               <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>

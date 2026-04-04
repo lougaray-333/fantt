@@ -126,7 +126,7 @@ export default function SharedView({ token }) {
       <div className="flex items-center justify-between border-b border-border px-5 py-3 shrink-0 bg-sidebar">
         <div className="flex items-center gap-2.5">
           <FanttLogo size={20} />
-          <span className="text-sm font-bold text-text">Fantt</span>
+          <span className="text-sm font-bold text-text">Fantt Chart</span>
         </div>
         {project?.name && (
           <span className="text-sm font-medium text-text-muted">{project.name}</span>
