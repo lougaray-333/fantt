@@ -447,9 +447,6 @@ export default function GanttChart({
         style={{ display: 'block' }}
       >
         <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <path d="M0,0.5 L7,3 L0,5.5" fill="none" stroke="var(--color-text-muted)" strokeWidth={1.2} />
-          </marker>
           {clipPathDefs}
         </defs>
 
@@ -501,41 +498,38 @@ export default function GanttChart({
           );
         })}
 
-        {/* Dependency arrows */}
+        {/* Dependency connectors */}
         {tasks.map((task, i) =>
           (task.dependencies || []).map((depId) => {
             const depIdx = tasks.findIndex((t) => t.id === depId);
             if (depIdx === -1) return null;
             const dep = tasks[depIdx];
-            const depBarEnd =
-              dayToX(dep.end) +
-              Math.max((diffDays(dep.end, addDays(new Date(dep.end + 'T00:00:00'), 1))) * colWidth, colWidth);
-            const fromX = depBarEnd;
+            const fromX = dayToX(dep.end) + colWidth;
             const fromY = depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
             const toX = dayToX(task.start);
             const toY = i * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-            const gap = 10;
+            const gap = 8;
             const cornerX = fromX + gap;
+            const d = toX > fromX + gap * 2
+              ? `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${toY} L${toX},${toY}`
+              : `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${
+                  fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
+                } L${toX - gap},${
+                  fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
+                } L${toX - gap},${toY} L${toX},${toY}`;
 
             return (
-              <path
-                key={`dep-${dep.id}-${task.id}`}
-                d={
-                  toX > fromX + gap * 2
-                    ? `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${toY} L${toX - 2},${toY}`
-                    : `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${
-                        fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
-                      } L${toX - gap},${
-                        fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
-                      } L${toX - gap},${toY} L${toX - 2},${toY}`
-                }
-                fill="none"
-                stroke="var(--color-text-muted)"
-                strokeWidth={1.5}
-                strokeLinejoin="round"
-                markerEnd="url(#arrowhead)"
-              />
+              <g key={`dep-${dep.id}-${task.id}`} opacity={0.4} style={{ pointerEvents: 'none' }}>
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="var(--color-text-muted)"
+                  strokeWidth={1}
+                  strokeLinejoin="round"
+                />
+                <circle cx={fromX} cy={fromY} r={2.5} fill="var(--color-text-muted)" />
+                <circle cx={toX} cy={toY} r={2.5} fill="var(--color-text-muted)" />
+              </g>
             );
           })
         )}

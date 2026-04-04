@@ -84,7 +84,17 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
     }
   };
 
+  const editingIdx = tasks.findIndex((t) => t.id === editingTask?.id);
+  const previousTask = editingIdx > 0 ? tasks[editingIdx - 1] : null;
   const otherTasks = tasks.filter((t) => t.id !== editingTask?.id);
+  const sortedOtherTasks = [...otherTasks].sort((a, b) => {
+    const aChecked = form.dependencies.includes(a.id);
+    const bChecked = form.dependencies.includes(b.id);
+    if (aChecked !== bChecked) return aChecked ? -1 : 1;
+    const aIdx = tasks.findIndex((t) => t.id === a.id);
+    const bIdx = tasks.findIndex((t) => t.id === b.id);
+    return Math.abs(aIdx - editingIdx) - Math.abs(bIdx - editingIdx);
+  });
 
   const toggleDep = (id) => {
     setForm((prev) => ({
@@ -291,8 +301,24 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
       {otherTasks.length > 0 && (
         <div>
           <label className="mb-1 block text-xs font-medium text-text-muted">Dependencies</label>
-          <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border bg-bg p-2">
-            {otherTasks.map((t) => {
+          {previousTask && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!form.dependencies.includes(previousTask.id)) toggleDep(previousTask.id);
+              }}
+              className={`mb-1.5 w-full rounded-lg border px-3 py-1.5 text-left text-xs transition ${
+                form.dependencies.includes(previousTask.id)
+                  ? 'border-accent/40 bg-accent/10 text-accent cursor-default'
+                  : 'border-border text-text-muted hover:border-accent/40 hover:text-text'
+              }`}
+            >
+              {form.dependencies.includes(previousTask.id) ? '✓ ' : '↑ '}
+              {previousTask.name}
+            </button>
+          )}
+          <div className="max-h-28 space-y-1 overflow-y-auto rounded-lg border border-border bg-bg p-2">
+            {sortedOtherTasks.map((t) => {
               const checked = form.dependencies.includes(t.id);
               return (
                 <label
