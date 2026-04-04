@@ -10,7 +10,7 @@ import {
   ClipboardPaste,
   X,
 } from 'lucide-react';
-import FantasyLogo from './FantasyLogo';
+import FanttLogo from './FanttLogo';
 import { parseWBS } from '../utils/parseWBS';
 
 export default function ProjectDashboard({
@@ -112,8 +112,12 @@ export default function ProjectDashboard({
       {/* Header */}
       <header className="border-b border-border bg-sidebar">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <div className="flex items-center">
-            <FantasyLogo height={20} color="var(--color-text)" />
+          <div className="flex flex-col leading-none gap-0.5">
+            <span className="text-sm font-bold tracking-tight text-text">Fantt</span>
+            <div className="flex items-center gap-1">
+              <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
+              <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-muted">{userEmail}</span>
