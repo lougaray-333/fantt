@@ -211,28 +211,59 @@ export function useTaskStore(projectId) {
     const dependents = getDependents(taskId, snapshot);
     const affectedIds = new Set([taskId, ...dependents]);
 
-    setTasks(
-      snapshot.map((t) => {
-        if (affectedIds.has(t.id)) {
-          // Preserve business-day duration: snap start to Monday, recompute end
-          const rawStart = addDays(new Date(t.start + 'T00:00:00'), daysDelta);
-          const snappedStart = snapToMonday(rawStart);
-          const bizDuration = businessDaysBetween(
-            new Date(t.start + 'T00:00:00'),
-            addDays(new Date(t.end + 'T00:00:00'), 1)
-          );
-          const calOffset = bizDuration > 1
-            ? businessToCalendarDays(snappedStart, bizDuration - 1)
-            : 0;
-          return {
-            ...t,
-            start: formatDate(snappedStart),
-            end: formatDate(addDays(snappedStart, calOffset)),
-          };
-        }
-        return t;
-      })
-    );
+    // Helper: given a task's original dates, compute new start/end preserving biz duration
+    const recompute = (origStart, origEnd, newStart) => {
+      const snapped = snapToMonday(newStart);
+      const bizDuration = businessDaysBetween(
+        new Date(origStart + 'T00:00:00'),
+        addDays(new Date(origEnd + 'T00:00:00'), 1)
+      );
+      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1) : 0;
+      return { start: formatDate(snapped), end: formatDate(addDays(snapped, calOffset)) };
+    };
+
+    // Next business day after a given end date string
+    const nextBizDay = (endDateStr) => {
+      const d = addDays(new Date(endDateStr + 'T00:00:00'), 1);
+      return snapToMonday(d);
+    };
+
+    // Build updated map — start with snapshot, update primary task first
+    const updatedMap = new Map(snapshot.map((t) => [t.id, t]));
+
+    const primary = snapshot.find((t) => t.id === taskId);
+    const primaryNewStart = addDays(new Date(primary.start + 'T00:00:00'), daysDelta);
+    const { start: ps, end: pe } = recompute(primary.start, primary.end, primaryNewStart);
+    updatedMap.set(taskId, { ...primary, start: ps, end: pe });
+
+    // Process dependents in dependency order: retry if a dependency hasn't been updated yet
+    const toProcess = [...dependents];
+    const processed = new Set([taskId]);
+    let guard = 0;
+    while (toProcess.length > 0 && guard++ < 500) {
+      const id = toProcess.shift();
+      const task = snapshot.find((t) => t.id === id);
+      if (!task) { processed.add(id); continue; }
+
+      // Wait until all of this task's dependencies that are in affectedIds are processed
+      const pendingDeps = (task.dependencies || []).filter((d) => affectedIds.has(d) && !processed.has(d));
+      if (pendingDeps.length > 0) { toProcess.push(id); continue; }
+
+      // Start = next biz day after the latest end among all dependencies
+      let latestEnd = null;
+      for (const depId of (task.dependencies || [])) {
+        const dep = updatedMap.get(depId);
+        if (!dep) continue;
+        if (!latestEnd || dep.end > latestEnd) latestEnd = dep.end;
+      }
+
+      const newStart = latestEnd ? nextBizDay(latestEnd) : addDays(new Date(task.start + 'T00:00:00'), daysDelta);
+      const { start: s, end: e } = recompute(task.start, task.end, newStart);
+      updatedMap.set(id, { ...task, start: s, end: e });
+      processed.add(id);
+    }
+
+    setTasks(snapshot.map((t) => updatedMap.get(t.id) || t));
   }, []);
 
   const endDrag = useCallback(() => {
