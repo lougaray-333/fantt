@@ -1,6 +1,6 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
-import { getTaskColor, getAllGroups } from '../utils/colors';
+import { getTaskColor, getAllGroups, getContrastColor } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
 export const BAR_HEIGHT = 28;
@@ -549,6 +549,7 @@ export default function GanttChart({
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);
+          const textColor = getContrastColor(color);
           const isSelected = selectedId === task.id;
           const progress = task.progress || 0;
           const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);
@@ -640,18 +641,18 @@ export default function GanttChart({
                 <rect x={x - 2} y={y - 2} width={barWidth + 4} height={BAR_HEIGHT + 4} rx={7} fill="none" stroke={color} strokeWidth={2} opacity={0.4} />
               )}
 
-              <rect x={x} y={y} width={barWidth} height={BAR_HEIGHT} rx={5} fill={color} opacity={0.85} />
+              <rect x={x} y={y} width={barWidth} height={BAR_HEIGHT} rx={5} fill={color} opacity={0.85} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
 
               {progress > 0 && (
                 <rect x={x} y={y} width={barWidth * (progress / 100)} height={BAR_HEIGHT} rx={5} fill={color} opacity={1} style={{ pointerEvents: 'none' }} />
               )}
 
-              <text x={x + 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={500} fill="white" clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+              <text x={x + 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={500} fill={textColor} clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                 {task.name}
               </text>
 
               {viewMode === 'day' && totalHoursPerDay > 0 && barWidth > 60 && (
-                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill="white" opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill={textColor} opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                   {totalHoursPerDay}h/d
                 </text>
               )}

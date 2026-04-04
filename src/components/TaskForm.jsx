@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, X, Trash2, Check, Diamond } from 'lucide-react';
 import { formatDate } from '../utils/dates';
-import { PRESET_COLORS } from '../utils/colors';
+import { PRESET_COLORS, getContrastColor } from '../utils/colors';
 
 export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDelete }) {
   // Default start = day after the last task's end date, or today
@@ -168,11 +168,15 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
               type="button"
               onClick={() => selectColor(c.hex)}
               title={c.name}
-              className={`h-6 w-6 rounded-md border-2 transition ${
+              className={`relative h-6 w-6 rounded-md border-2 transition flex items-center justify-center ${
                 form.color === c.hex ? 'border-text scale-110' : 'border-transparent hover:scale-110'
               }`}
               style={{ backgroundColor: c.hex }}
-            />
+            >
+              {form.color === c.hex && (
+                <Check size={12} style={{ color: getContrastColor(c.hex) }} strokeWidth={3} />
+              )}
+            </button>
           ))}
         </div>
         {/* Custom hex input */}

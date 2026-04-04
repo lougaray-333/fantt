@@ -1,14 +1,11 @@
-// 9 preset colors for task bars — Fantasy brand palette
+// 6 preset colors — Fantasy brand palette
 export const PRESET_COLORS = [
-  { name: 'Gold', hex: '#ba9634' },
-  { name: 'Emerald', hex: '#34d399' },
-  { name: 'Bronze', hex: '#cd7f32' },
-  { name: 'Ruby', hex: '#ef4444' },
-  { name: 'Violet', hex: '#a78bfa' },
-  { name: 'Teal', hex: '#2dd4bf' },
-  { name: 'Amber', hex: '#fbbf24' },
-  { name: 'Coral', hex: '#fb7185' },
-  { name: 'Sapphire', hex: '#818cf8' },
+  { name: 'Red',    hex: '#E52222' },
+  { name: 'Black',  hex: '#000000' },
+  { name: 'Blue',   hex: '#1d4ed8' },
+  { name: 'Green',  hex: '#15803d' },
+  { name: 'Violet', hex: '#7c3aed' },
+  { name: 'Amber',  hex: '#d97706' },
 ];
 
 // Fallback: assign color by group if task has no custom color
@@ -32,4 +29,18 @@ export function getAllGroups(tasks) {
     if (t.group) groups.add(t.group);
   });
   return [...groups].sort();
+}
+
+// WCAG relative luminance → returns '#ffffff' or '#000000' for best contrast
+export function getContrastColor(hex) {
+  const raw = hex.replace('#', '');
+  if (raw.length !== 6) return '#ffffff';
+  const r = parseInt(raw.slice(0, 2), 16) / 255;
+  const g = parseInt(raw.slice(2, 4), 16) / 255;
+  const b = parseInt(raw.slice(4, 6), 16) / 255;
+  const lin = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  // Contrast ratio vs white: (1.05) / (L + 0.05)
+  // Contrast ratio vs black: (L + 0.05) / (0.05)
+  return (1.05 / (L + 0.05)) >= ((L + 0.05) / 0.05) ? '#ffffff' : '#000000';
 }
