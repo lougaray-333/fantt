@@ -633,22 +633,22 @@ export default memo(function ResourceGrid({
               style={{ width: ROLE_COL_WIDTH }}
             >
               <div className="flex items-center justify-between px-3 border-b border-border/50" style={{ height: ROW_H }}>
-                <span className="text-[11px] font-bold text-accent">Total Hours</span>
-                <span className="text-[11px] font-bold text-accent font-mono">{totals.grandHours.toLocaleString()}h</span>
+                <span className="text-[11px] font-bold text-white">Total Hours</span>
+                <span className="text-[11px] font-bold text-white font-mono">{totals.grandHours.toLocaleString()}h</span>
               </div>
               {(() => {
                 const oopTotal = (oopExpenses || []).reduce((s, o) => s + (o.amount || 0), 0);
                 if (oopTotal <= 0) return null;
                 return (
                   <div className="flex items-center justify-between px-3 border-b border-border/50" style={{ height: ROW_H }}>
-                    <span className="text-[11px] font-bold text-accent">Total OOP</span>
-                    <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(oopTotal)}</span>
+                    <span className="text-[11px] font-bold text-white">Total OOP</span>
+                    <span className="text-[11px] font-bold text-white font-mono">{formatCurrency(oopTotal)}</span>
                   </div>
                 );
               })()}
               <div className="flex items-center justify-between px-3" style={{ height: ROW_H }}>
-                <span className="text-[11px] font-bold text-accent">Total Budget</span>
-                <span className="text-[11px] font-bold text-accent font-mono">{formatCurrency(totals.grandTotal)}</span>
+                <span className="text-[11px] font-bold text-white">Total Budget</span>
+                <span className="text-[11px] font-bold text-white font-mono">{formatCurrency(totals.grandTotal)}</span>
               </div>
             </div>
             <div ref={bottomScrollRef} className="flex-1 overflow-hidden">
@@ -664,7 +664,7 @@ export default memo(function ResourceGrid({
                           ${colHighlight(d.str)}`}
                         style={{ width: colWidth, height: ROW_H }}
                       >
-                        <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-accent' : 'text-text-muted/30'}`}>
+                        <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-white' : 'text-text-muted/30'}`}>
                           {dayHours > 0 ? dayHours : ''}
                         </span>
                       </div>
