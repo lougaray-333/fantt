@@ -37,6 +37,15 @@ export function isWeekend(date) {
   return toLocal(date).getDay() === 0 || toLocal(date).getDay() === 6;
 }
 
+// Snap a date forward to Monday if it falls on a weekend
+export function snapToMonday(date) {
+  const d = toLocal(date);
+  const day = d.getDay();
+  if (day === 6) d.setDate(d.getDate() + 2); // Saturday → Monday
+  if (day === 0) d.setDate(d.getDate() + 1); // Sunday → Monday
+  return d;
+}
+
 export function isSameDay(a, b) {
   return formatDate(a) === formatDate(b);
 }

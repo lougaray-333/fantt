@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { addDays, formatDate } from '../utils/dates';
+import { addDays, formatDate, businessDaysBetween, businessToCalendarDays, snapToMonday } from '../utils/dates';
 import { supabase, isConfigured } from '../lib/supabase';
 
 const STORAGE_KEY = 'gantt-v2-tasks';
@@ -214,10 +214,20 @@ export function useTaskStore(projectId) {
     setTasks(
       snapshot.map((t) => {
         if (affectedIds.has(t.id)) {
+          // Preserve business-day duration: snap start to Monday, recompute end
+          const rawStart = addDays(new Date(t.start + 'T00:00:00'), daysDelta);
+          const snappedStart = snapToMonday(rawStart);
+          const bizDuration = businessDaysBetween(
+            new Date(t.start + 'T00:00:00'),
+            addDays(new Date(t.end + 'T00:00:00'), 1)
+          );
+          const calOffset = bizDuration > 1
+            ? businessToCalendarDays(snappedStart, bizDuration - 1)
+            : 0;
           return {
             ...t,
-            start: formatDate(addDays(new Date(t.start + 'T00:00:00'), daysDelta)),
-            end: formatDate(addDays(new Date(t.end + 'T00:00:00'), daysDelta)),
+            start: formatDate(snappedStart),
+            end: formatDate(addDays(snappedStart, calOffset)),
           };
         }
         return t;
