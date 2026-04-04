@@ -1,6 +1,6 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
-import { getTaskColor, getAllGroups, getContrastColor } from '../utils/colors';
+import { getTaskColor, getAllGroups, getContrastColor, PRESET_HEXES } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
 export const BAR_HEIGHT = 28;
@@ -549,7 +549,9 @@ export default function GanttChart({
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);
-          const textColor = getContrastColor(color);
+          // Preset and group-assigned colors are always dark enough for white text.
+          // Only run contrast check for user-entered custom hex values.
+          const textColor = PRESET_HEXES.has(color) ? '#ffffff' : getContrastColor(color);
           const isSelected = selectedId === task.id;
           const progress = task.progress || 0;
           const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);

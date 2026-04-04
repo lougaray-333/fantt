@@ -1,12 +1,14 @@
 // 6 preset colors — Fantasy brand palette
 export const PRESET_COLORS = [
   { name: 'Red',    hex: '#E52222' },
-  { name: 'Black',  hex: '#000000' },
   { name: 'Blue',   hex: '#1d4ed8' },
   { name: 'Green',  hex: '#15803d' },
   { name: 'Violet', hex: '#7c3aed' },
   { name: 'Amber',  hex: '#d97706' },
+  { name: 'Teal',   hex: '#0f766e' },
 ];
+
+export const PRESET_HEXES = new Set(PRESET_COLORS.map((c) => c.hex));
 
 // Fallback: assign color by group if task has no custom color
 const GROUP_COLORS = PRESET_COLORS.map((c) => c.hex);

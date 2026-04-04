@@ -174,7 +174,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
               style={{ backgroundColor: c.hex }}
             >
               {form.color === c.hex && (
-                <Check size={12} style={{ color: getContrastColor(c.hex) }} strokeWidth={3} />
+                <Check size={12} style={{ color: '#ffffff' }} strokeWidth={3} />
               )}
             </button>
           ))}
