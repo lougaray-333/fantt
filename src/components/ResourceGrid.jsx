@@ -272,7 +272,7 @@ export default memo(function ResourceGrid({
           <button
             onClick={() => setBreakdownOpen((o) => !o)}
             className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition
-              ${breakdownOpen ? 'bg-accent text-white' : 'bg-accent/15 text-accent hover:bg-accent/25'}`}
+              ${breakdownOpen ? 'bg-white/15 text-white' : 'bg-white/8 text-white hover:bg-white/15'}`}
           >
             {formatCurrency(totals.grandTotal)}
           </button>
