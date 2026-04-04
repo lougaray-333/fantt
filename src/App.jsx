@@ -126,7 +126,7 @@ export default function App() {
   // Landing page for new visitors
   if (showLanding && !email) {
     return (
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={null}>
         <LandingPage onGetStarted={() => setShowLanding(false)} />
       </Suspense>
     );
@@ -137,10 +137,10 @@ export default function App() {
     return <AuthGate onEnter={handleEnter} />;
   }
 
-  // Project dashboard
+  // Project dashboard — no spinner here, AppLoader already played
   if (!activeProjectId) {
     return (
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={null}>
         <ProjectDashboard
           projects={projectStore.projects}
           loading={projectStore.loading}
