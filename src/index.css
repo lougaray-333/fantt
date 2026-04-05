@@ -170,6 +170,10 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 0.55; transform: translateY(0); }
 }
+@keyframes fantt-shield-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.08); }
+}
 @keyframes fantt-item-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
