@@ -738,6 +738,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               onRemoveOop={handleRemoveOop}
               collapsed={budgetCollapsed}
               onToggle={() => setBudgetCollapsed((c) => !c)}
+              onClearAll={() => setResourceHours({})}
               resourceScrollRef={resourceScrollRef}
               highlightedDate={highlightedDate}
               onDateClick={setHighlightedDate}

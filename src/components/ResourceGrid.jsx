@@ -1,5 +1,5 @@
 import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, X, Eraser } from 'lucide-react';
 import { RATE_CARD, getDepartments } from '../data/rateCard';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange } from '../utils/dates';
 import { COL_WIDTHS } from './GanttChart';
@@ -42,6 +42,7 @@ export default memo(function ResourceGrid({
   onRemoveOop,
   collapsed,
   onToggle,
+  onClearAll,
   resourceScrollRef,
   ganttScrollRef,
   highlightedDate,
@@ -227,8 +228,7 @@ export default memo(function ResourceGrid({
   const gridWidth = dates.length * colWidth;
   const totalWidth = ROLE_COL_WIDTH + gridWidth;
 
-  const colHighlight = (dateStr) =>
-    highlightedDate === dateStr ? 'bg-accent/8' : '';
+  const isColActive = (d) => d.isToday || highlightedDate === d.str;
 
   // Sticky cell style for role column
   const stickyLeft = 'sticky left-0 z-10';
@@ -268,7 +268,17 @@ export default memo(function ResourceGrid({
           )}
           <span className="text-xs font-bold text-text">Resource Budget</span>
         </button>
-        <div className="ml-auto relative" ref={breakdownRef}>
+        {onClearAll && totals.grandHours > 0 && (
+          <button
+            onClick={onClearAll}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-text-muted hover:text-red-400 hover:bg-red-500/10 transition"
+            title="Clear all hours"
+          >
+            <Eraser size={11} />
+            Clear
+          </button>
+        )}
+        <div className="ml-2 relative" ref={breakdownRef}>
           <button
             onClick={() => setBreakdownOpen((o) => !o)}
             className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition
@@ -389,12 +399,11 @@ export default memo(function ResourceGrid({
                     onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
                     className={`shrink-0 flex flex-col items-center justify-center text-center border-r border-border/30 cursor-pointer
                       hover:bg-accent/15 transition-colors select-none
-                      ${d.isToday ? 'bg-accent/10 font-bold' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}
-                      ${colHighlight(d.str)}`}
+                      ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: colWidth, height: ROW_H }}
                   >
-                    <span className={`text-[9px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted'}`}>{d.day}</span>
-                    <span className={`text-[8px] leading-none ${d.isToday ? 'text-accent' : 'text-text-muted/60'}`}>{d.abbr}</span>
+                    <span className={`text-[9px] leading-none ${isColActive(d) ? 'text-accent font-bold' : 'text-text-muted'}`}>{d.day}</span>
+                    <span className={`text-[8px] leading-none ${isColActive(d) ? 'text-accent' : 'text-text-muted/60'}`}>{d.abbr}</span>
                   </div>
                 ))}
               </div>
@@ -490,8 +499,7 @@ export default memo(function ResourceGrid({
                               <div
                                 key={d.str}
                                 className={`shrink-0 border-r border-border/20 flex items-center justify-center
-                                  ${orphaned ? 'bg-red-500/10' : d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                                  ${colHighlight(d.str)}`}
+                                  ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                                 style={{ width: colWidth, height: ROW_H }}
                                 title={orphaned ? 'No activity on this date' : undefined}
                               >
@@ -616,8 +624,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/20
-                        ${d.isToday ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                        ${colHighlight(d.str)}`}
+                        ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
@@ -660,8 +667,7 @@ export default memo(function ResourceGrid({
                       <div
                         key={d.str}
                         className={`shrink-0 border-r border-border/30 flex items-center justify-center
-                          ${d.isToday ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                          ${colHighlight(d.str)}`}
+                          ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                         style={{ width: colWidth, height: ROW_H }}
                       >
                         <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-text' : 'text-text-muted/30'}`}>
@@ -676,8 +682,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/30
-                        ${d.isToday ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}
-                        ${colHighlight(d.str)}`}
+                        ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}

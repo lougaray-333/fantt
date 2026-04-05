@@ -406,10 +406,10 @@ export default function GanttChart({
             <g key={i}>
               {viewMode === 'day' ? (
                 <>
-                  <text x={h.x + h.width / 2} y={60} textAnchor="middle" fontSize={12} fontWeight={h.isToday ? 700 : 500} fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text)'} style={{ fontFamily: 'var(--font-sans)' }}>
+                  <text x={h.x + h.width / 2} y={60} textAnchor="middle" fontSize={12} fontWeight={h.isToday || highlightedDate === h.dateStr ? 700 : 500} fill={h.isToday || highlightedDate === h.dateStr ? 'var(--color-accent)' : 'var(--color-text)'} style={{ fontFamily: 'var(--font-sans)' }}>
                     {h.label}
                   </text>
-                  <text x={h.x + h.width / 2} y={74} textAnchor="middle" fontSize={9} fill={h.isToday ? 'var(--color-accent)' : 'var(--color-text-muted)'} style={{ fontFamily: 'var(--font-sans)' }}>
+                  <text x={h.x + h.width / 2} y={74} textAnchor="middle" fontSize={9} fill={h.isToday || highlightedDate === h.dateStr ? 'var(--color-accent)' : 'var(--color-text-muted)'} style={{ fontFamily: 'var(--font-sans)' }}>
                     {h.sublabel}
                   </text>
                   {onDateClick && h.dateStr && (
@@ -452,15 +452,8 @@ export default function GanttChart({
         {/* Today column highlight */}
         {showToday && (
           <>
-            <rect
-              x={todayX} y={0} width={colWidth} height={bodyHeight}
-              fill="var(--color-accent)" fillOpacity={0.05}
-            />
-            <line
-              x1={todayX + colWidth / 2} y1={0}
-              x2={todayX + colWidth / 2} y2={bodyHeight}
-              stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.5}
-            />
+            <rect x={todayX} y={0} width={colWidth} height={bodyHeight} fill="var(--color-accent)" fillOpacity={0.06} />
+            <line x1={todayX + colWidth / 2} y1={0} x2={todayX + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.4} />
           </>
         )}
 
@@ -469,11 +462,10 @@ export default function GanttChart({
           const hx = dayToX(highlightedDate);
           if (hx < 0 || hx > chartWidth) return null;
           return (
-            <rect
-              x={hx} y={0} width={colWidth} height={bodyHeight}
-              fill="var(--color-accent)" fillOpacity={0.08}
-              style={{ pointerEvents: 'none' }}
-            />
+            <>
+              <rect x={hx} y={0} width={colWidth} height={bodyHeight} fill="var(--color-accent)" fillOpacity={0.06} style={{ pointerEvents: 'none' }} />
+              <line x1={hx + colWidth / 2} y1={0} x2={hx + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.4} style={{ pointerEvents: 'none' }} />
+            </>
           );
         })()}
 
