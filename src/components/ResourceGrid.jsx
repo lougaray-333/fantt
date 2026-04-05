@@ -425,7 +425,7 @@ export default memo(function ResourceGrid({
                         <div
                           key={d.str}
                           className={`shrink-0 border-r border-border/20 bg-bg-alt/60
-                            ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
+                            ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                           style={{ width: colWidth, height: ROW_H }}
                         />
                       ))}
@@ -584,7 +584,7 @@ export default memo(function ResourceGrid({
                   <div
                     key={d.str}
                     className={`shrink-0 border-r border-border/20 bg-bg-alt/60
-                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''} ${colHighlight(d.str)}`}
+                      ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                     style={{ width: colWidth, height: ROW_H }}
                   />
                 ))}
