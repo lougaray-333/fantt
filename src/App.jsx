@@ -163,7 +163,7 @@ export default function App() {
   // Gantt editor
   const activeProject = projectStore.projects.find(p => p.id === activeProjectId);
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={null}>
       <GanttEditor
         projectId={activeProjectId}
         projectName={activeProject?.name || ''}
