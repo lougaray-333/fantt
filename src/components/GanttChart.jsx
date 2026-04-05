@@ -370,8 +370,7 @@ export default function GanttChart({
             return (
               <rect
                 x={hx} y={0} width={colWidth} height={HEADER_HEIGHT}
-                fill="var(--color-accent)" fillOpacity={0.08}
-                stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.4} rx={2}
+                fill="var(--color-accent)" fillOpacity={0.1}
                 style={{ pointerEvents: 'none' }}
               />
             );
@@ -452,11 +451,17 @@ export default function GanttChart({
 
         {/* Today column highlight */}
         {showToday && (
-          <rect
-            x={todayX} y={0} width={colWidth} height={bodyHeight}
-            fill="var(--color-accent)" fillOpacity={0.04}
-            stroke="var(--color-accent)" strokeWidth={1.5} strokeDasharray="4,3" rx={2}
-          />
+          <>
+            <rect
+              x={todayX} y={0} width={colWidth} height={bodyHeight}
+              fill="var(--color-accent)" fillOpacity={0.05}
+            />
+            <line
+              x1={todayX + colWidth / 2} y1={0}
+              x2={todayX + colWidth / 2} y2={bodyHeight}
+              stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.5}
+            />
+          </>
         )}
 
         {/* User-clicked column highlight in body */}
@@ -467,7 +472,6 @@ export default function GanttChart({
             <rect
               x={hx} y={0} width={colWidth} height={bodyHeight}
               fill="var(--color-accent)" fillOpacity={0.08}
-              stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.4} rx={2}
               style={{ pointerEvents: 'none' }}
             />
           );

@@ -228,7 +228,7 @@ export default memo(function ResourceGrid({
   const totalWidth = ROLE_COL_WIDTH + gridWidth;
 
   const colHighlight = (dateStr) =>
-    highlightedDate === dateStr ? 'ring-2 ring-inset ring-accent/40 bg-accent/10' : '';
+    highlightedDate === dateStr ? 'bg-accent/8' : '';
 
   // Sticky cell style for role column
   const stickyLeft = 'sticky left-0 z-10';
