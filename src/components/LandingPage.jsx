@@ -45,7 +45,37 @@ const FEATURES = [
 
 export default function LandingPage({ onGetStarted }) {
   return (
-    <div className="min-h-screen bg-black text-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen text-white relative" style={{ fontFamily: 'Inter, sans-serif', background: '#000' }}>
+
+      {/* Background: gradient mesh + film grain */}
+      <div className="fixed inset-0" style={{ zIndex: 0, pointerEvents: 'none' }}>
+        {/* Red glow — lower-left, behind hero text */}
+        <div className="absolute inset-0" style={{
+          background: [
+            'radial-gradient(ellipse 75% 55% at 8% 78%, rgba(229,34,34,0.13) 0%, transparent 62%)',
+            'radial-gradient(ellipse 45% 35% at 85% 10%, rgba(229,34,34,0.06) 0%, transparent 55%)',
+            'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(8,0,0,0.7) 0%, transparent 70%)',
+          ].join(', '),
+        }} />
+        {/* Film grain via inline SVG noise filter */}
+        <svg
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.055 }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <filter id="landing-grain">
+            <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
+            <feColorMatrix type="saturate" values="0" />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#landing-grain)" />
+        </svg>
+        {/* Subtle vignette edges */}
+        <div className="absolute inset-0" style={{
+          background: 'radial-gradient(ellipse 120% 100% at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%)',
+        }} />
+      </div>
+
+      {/* Content */}
+      <div className="relative" style={{ zIndex: 1 }}>
 
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5">
@@ -134,6 +164,7 @@ export default function LandingPage({ onGetStarted }) {
         </div>
       </footer>
 
+      </div>{/* end content */}
     </div>
   );
 }
