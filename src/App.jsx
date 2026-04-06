@@ -10,6 +10,7 @@ import { supabase, isConfigured } from './lib/supabase';
 const LandingPage = lazy(() => import('./components/LandingPage'));
 const GodMode = lazy(() => import('./components/GodMode'));
 const SharedView = lazy(() => import('./components/SharedView'));
+const EditView = lazy(() => import('./components/EditView'));
 
 const EMAIL_KEY = 'fantt-user-email';
 const STORAGE_KEY = 'gantt-v2-tasks';
@@ -98,10 +99,20 @@ export default function App() {
     }
   };
 
-  // Skip loader for shared/godmode routes — show it only for main app
-  const isSpecialRoute = hash.startsWith('#/share/') || hash === '#/godmode';
+  // Skip loader for shared/godmode/edit routes — show it only for main app
+  const isSpecialRoute = hash.startsWith('#/share/') || hash.startsWith('#/edit/') || hash === '#/godmode';
   if (!loaderDone && !isSpecialRoute) {
     return <AppLoader onComplete={() => setLoaderDone(true)} />;
+  }
+
+  // Collaborative edit link (no auth required)
+  if (hash.startsWith('#/edit/')) {
+    const token = hash.replace('#/edit/', '');
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <EditView token={token} />
+      </Suspense>
+    );
   }
 
   // Public shared project view (no auth required)

@@ -1,28 +1,35 @@
 import { useState, useEffect } from 'react';
-import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function SharePanel({ projectId, projectName, onClose }) {
   const [tab, setTab] = useState('link');
   const [shareToken, setShareToken] = useState(null);
   const [shareEnabled, setShareEnabled] = useState(false);
+  const [editToken, setEditToken] = useState(null);
+  const [editEnabled, setEditEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editCopied, setEditCopied] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const [showEditRegenConfirm, setShowEditRegenConfirm] = useState(false);
 
   // Fetch current share state for this project
   useEffect(() => {
     async function fetchShareState() {
       const { data, error } = await supabase
         .from('projects')
-        .select('share_token, share_enabled')
+        .select('share_token, share_enabled, edit_token, edit_enabled')
         .eq('id', projectId)
         .single();
 
       if (!error && data) {
         setShareToken(data.share_token);
         setShareEnabled(data.share_enabled ?? false);
+        setEditToken(data.edit_token);
+        setEditEnabled(data.edit_enabled ?? false);
       }
       setLoading(false);
     }
@@ -82,6 +89,45 @@ export default function SharePanel({ projectId, projectName, onClose }) {
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  const editUrl = editToken
+    ? `${window.location.origin}/#/edit/${editToken}`
+    : null;
+
+  async function handleToggleEditEnable() {
+    setEditSaving(true);
+    let token = editToken;
+    if (!token) {
+      token = crypto.randomUUID();
+      setEditToken(token);
+    }
+    const next = !editEnabled;
+    const { error } = await supabase
+      .from('projects')
+      .update({ edit_token: token, edit_enabled: next })
+      .eq('id', projectId);
+    if (!error) setEditEnabled(next);
+    setEditSaving(false);
+  }
+
+  async function handleRegenEditToken() {
+    setEditSaving(true);
+    const token = crypto.randomUUID();
+    const { error } = await supabase
+      .from('projects')
+      .update({ edit_token: token, edit_enabled: true })
+      .eq('id', projectId);
+    if (!error) { setEditToken(token); setEditEnabled(true); }
+    setShowEditRegenConfirm(false);
+    setEditSaving(false);
+  }
+
+  function handleEditCopy() {
+    if (!editUrl) return;
+    navigator.clipboard.writeText(editUrl);
+    setEditCopied(true);
+    setTimeout(() => setEditCopied(false), 2000);
   }
 
   return (
@@ -209,6 +255,95 @@ export default function SharePanel({ projectId, projectName, onClose }) {
                 {!shareEnabled && shareToken && (
                   <p className="text-xs text-text-muted text-center">
                     Link is disabled. Toggle on to re-enable — your previous link will be restored.
+                  </p>
+                )}
+
+                {/* Divider */}
+                <div className="border-t border-border" />
+
+                {/* Edit link section */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-text">Edit link</p>
+                    <p className="text-xs text-text-muted mt-0.5">Full access · Anyone with the link can edit</p>
+                  </div>
+                  <button
+                    onClick={handleToggleEditEnable}
+                    disabled={editSaving}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                      editEnabled ? 'bg-accent' : 'bg-border'
+                    } disabled:opacity-50`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        editEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {editEnabled && editUrl && (
+                  <>
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 flex items-center gap-2">
+                      <AlertTriangle size={12} className="text-amber-500 shrink-0" />
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">Anyone with this link can edit the project</p>
+                    </div>
+
+                    <div className="rounded-lg border border-border bg-bg-alt p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Pencil size={12} className="text-accent shrink-0" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">Edit link</span>
+                      </div>
+                      <p className="text-xs text-text break-all leading-relaxed">{editUrl}</p>
+                    </div>
+
+                    <button
+                      onClick={handleEditCopy}
+                      className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 transition"
+                    >
+                      {editCopied ? <Check size={13} /> : <Copy size={13} />}
+                      {editCopied ? 'Copied!' : 'Copy edit link'}
+                    </button>
+
+                    {!showEditRegenConfirm ? (
+                      <button
+                        onClick={() => setShowEditRegenConfirm(true)}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+                      >
+                        <RefreshCw size={12} />
+                        Regenerate edit link
+                      </button>
+                    ) : (
+                      <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 flex flex-col gap-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
+                          <p className="text-xs text-text-muted leading-relaxed">
+                            The current edit link will stop working immediately.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleRegenEditToken}
+                            disabled={editSaving}
+                            className="flex-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 transition disabled:opacity-50"
+                          >
+                            {editSaving ? 'Regenerating…' : 'Yes, regenerate'}
+                          </button>
+                          <button
+                            onClick={() => setShowEditRegenConfirm(false)}
+                            className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {!editEnabled && editToken && (
+                  <p className="text-xs text-text-muted text-center">
+                    Edit link is disabled. Toggle on to re-enable.
                   </p>
                 )}
               </>

@@ -207,7 +207,7 @@ export default memo(function GanttChart({
       let didMove = false;
       didDragRef.current = false;
 
-      if (type === 'move') onBeginDrag();
+      if (type === 'move') onBeginDrag(task.id);
 
       function onMove(ev) {
         const dx = ev.clientX - startX;

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList, Share2 } from 'lucide-react';
+import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList, Share2, History } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -14,7 +14,10 @@ const BugReportButton = lazy(() => import('./BugReportButton'));
 import ResourceGrid from './ResourceGrid';
 import SharePanel from './SharePanel';
 import { useHistory } from '../hooks/useHistory';
+import { usePresence } from '../hooks/usePresence';
 import { supabase, isConfigured } from '../lib/supabase';
+
+const ChangeHistory = lazy(() => import('./ChangeHistory'));
 
 // Shift resource hours by business days derived from the calendar delta.
 // Tasks shift by calendarDelta calendar days. We figure out how many business
@@ -47,10 +50,16 @@ function shiftAllHours(resourceHours, calendarDelta, refDate) {
   return shifted;
 }
 
-export default function GanttEditor({ projectId, projectName, email, onBack }) {
-  const store = useTaskStore(projectId);
+export default function GanttEditor({ projectId, projectName, email, onBack, isCollaborator = false }) {
+  const history = useHistory();
+  const store = useTaskStore(projectId, {
+    identity: email || 'Collaborator',
+    onRemoteChange: () => history.clear(),
+  });
   const { theme, toggleTheme } = useTheme();
+  const { otherCount } = usePresence(projectId, email || 'Collaborator');
   const [viewMode, setViewMode] = useState('day');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -99,7 +108,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   }, [hideWeekends]);
 
   // Undo/Redo
-  const history = useHistory();
   const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {} });
   useEffect(() => {
     stateRef.current = { tasks: store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames };
@@ -157,6 +165,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
 
   // Auto-save budget data to localStorage + Supabase (debounced)
   const saveBudgetRef = useRef(null);
+  const lastLocalBudgetSaveRef = useRef(0);
   useEffect(() => {
     clearTimeout(saveBudgetRef.current);
     saveBudgetRef.current = setTimeout(() => {
@@ -166,6 +175,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
       localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
       // Sync to Supabase
       if (isConfigured && projectId) {
+        lastLocalBudgetSaveRef.current = Date.now();
         supabase.from('project_budgets').upsert({
           project_id: projectId,
           resource_hours: resourceHours,
@@ -177,6 +187,28 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
       }
     }, 500);
   }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey, projectId]);
+
+  // Realtime subscription for budget changes from other collaborators
+  useEffect(() => {
+    if (!isConfigured || !projectId) return;
+    const ch = supabase
+      .channel(`budget:${projectId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'project_budgets',
+        filter: `project_id=eq.${projectId}`,
+      }, ({ new: row }) => {
+        // Guard: if we just saved locally in the past 3 seconds, ignore (our own echo)
+        if (Date.now() - lastLocalBudgetSaveRef.current < 3000) return;
+        if (row.resource_hours) setResourceHours(row.resource_hours);
+        if (row.oop_expenses) setOopExpenses(row.oop_expenses);
+        if (row.hidden_roles) setHiddenRoles(row.hidden_roles);
+        if (row.role_names) setRoleNames(row.role_names);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [projectId]);
 
   // Auto-save every 30 seconds with toast notification
   const [autoSaveToast, setAutoSaveToast] = useState(null); // 'in' | 'out' | null
@@ -607,6 +639,23 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             </button>
           )}
 
+          {/* History panel toggle */}
+          <button
+            onClick={() => setHistoryOpen(o => !o)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${historyOpen ? 'bg-bg-alt text-text' : 'text-text-muted hover:bg-bg-alt'}`}
+            title="Change history"
+          >
+            <History size={13} />
+          </button>
+
+          {/* Presence badge */}
+          {otherCount > 0 && (
+            <div className="flex items-center gap-1.5 rounded-full bg-green-500/15 px-2.5 py-1 text-[10px] font-semibold text-green-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+              {otherCount} other{otherCount !== 1 ? 's' : ''} editing
+            </div>
+          )}
+
           {/* Save status */}
           <span className="text-[11px] text-text-muted/60">
             {store.saveStatus === 'saving' ? (
@@ -704,7 +753,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
                 }
               }}
               onTaskUpdate={(id, updates) => { snap(); store.updateTask(id, updates); }}
-              onBeginDrag={() => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(); }}
+              onBeginDrag={(taskId) => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(taskId); }}
               onDragMove={(taskId, daysDelta) => {
                 if (!dragRefDateRef.current) {
                   const task = store.tasks.find(t => t.id === taskId);
@@ -780,6 +829,13 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
             />
           </div>
         </div>
+      )}
+
+      {/* Change history panel */}
+      {historyOpen && (
+        <Suspense fallback={null}>
+          <ChangeHistory projectId={projectId} onClose={() => setHistoryOpen(false)} />
+        </Suspense>
       )}
 
       {/* Share panel */}

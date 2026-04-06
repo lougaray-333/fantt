@@ -64,7 +64,18 @@ function loadLocalTasks() {
   }
 }
 
-export function useTaskStore(projectId) {
+// Compute a diff of changed fields between old and updated values
+function diffFields(oldTask, updates) {
+  const result = {};
+  for (const k of Object.keys(updates)) {
+    if (JSON.stringify(oldTask[k]) !== JSON.stringify(updates[k])) {
+      result[k] = { from: oldTask[k], to: updates[k] };
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
   const [tasks, setTasks] = useState(() => isConfigured ? [] : loadLocalTasks());
   const [loading, setLoading] = useState(isConfigured);
   const [saveStatus, setSaveStatus] = useState('idle');
@@ -74,6 +85,8 @@ export function useTaskStore(projectId) {
   const debounceTimerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const lastAnimatedRef = useRef(0);
+  const recentlyWrittenRef = useRef(new Map()); // taskId → timestamp, for self-filtering realtime events
+  const draggingTaskIdRef = useRef(null);        // task being dragged, skip its remote updates
 
   const markSaving = useCallback(() => {
     const now = Date.now();
@@ -97,7 +110,20 @@ export function useTaskStore(projectId) {
     }
   }, [tasks]);
 
-  // Fetch tasks from Supabase on mount / projectId change
+  // Fire-and-forget history write
+  const recordHistory = useCallback((type, task, changedFields = null) => {
+    if (!isConfigured || !projectId) return;
+    supabase.from('task_history').insert({
+      project_id: projectId,
+      task_id: task.id,
+      task_name: task.name,
+      change_type: type,
+      changed_fields: changedFields,
+      changed_by: identity || 'Unknown',
+    }).then(() => {});
+  }, [projectId, identity]);
+
+  // Fetch tasks from Supabase on mount / projectId change + subscribe to realtime
   useEffect(() => {
     if (!isConfigured || !projectId) {
       setLoading(false);
@@ -105,6 +131,7 @@ export function useTaskStore(projectId) {
     }
 
     let cancelled = false;
+    let channel = null;
     setLoading(true);
 
     supabase
@@ -120,10 +147,52 @@ export function useTaskStore(projectId) {
           setTasks(mapped);
         }
         setLoading(false);
+
+        // Subscribe to realtime changes after initial load
+        channel = supabase
+          .channel(`tasks:${projectId}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'tasks',
+            filter: `project_id=eq.${projectId}`,
+          }, ({ eventType, new: row, old: oldRow }) => {
+            const id = row?.id ?? oldRow?.id;
+
+            // Self-filter: ignore our own writes within 2 seconds
+            const ts = recentlyWrittenRef.current.get(id);
+            if (ts && Date.now() - ts < 2000) return;
+
+            // Drag guard: don't overwrite the task currently being dragged
+            if (draggingTaskIdRef.current === id) return;
+
+            // Prune stale entries from self-filter map
+            const now = Date.now();
+            for (const [k, v] of recentlyWrittenRef.current) {
+              if (now - v > 5000) recentlyWrittenRef.current.delete(k);
+            }
+
+            if (eventType === 'INSERT') {
+              setTasks(prev => {
+                if (prev.some(t => t.id === id)) return prev; // idempotent
+                return [...prev, rowToTask(row)].sort((a, b) => a.sortOrder - b.sortOrder);
+              });
+            } else if (eventType === 'UPDATE') {
+              setTasks(prev => prev.map(t => t.id === id ? rowToTask(row) : t));
+            } else if (eventType === 'DELETE') {
+              setTasks(prev => prev.filter(t => t.id !== id));
+            }
+
+            onRemoteChange?.();
+          })
+          .subscribe();
       });
 
-    return () => { cancelled = true; };
-  }, [projectId]);
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [projectId, onRemoteChange]);
 
   // Touch project's updated_at
   const touchProject = useCallback(() => {
@@ -156,17 +225,25 @@ export function useTaskStore(projectId) {
     setTasks((prev) => [...prev, newTask]);
 
     if (isConfigured) {
+      recentlyWrittenRef.current.set(id, Date.now());
       supabase
         .from('tasks')
         .insert(taskToRow(newTask, projectId))
-        .then(() => touchProject());
+        .then(() => { touchProject(); recordHistory('create', newTask); });
     }
 
     return newTask;
-  }, [projectId, touchProject]);
+  }, [projectId, touchProject, recordHistory]);
 
   const updateTask = useCallback((id, updates) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    let oldTask = null;
+    setTasks((prev) => {
+      const updated = prev.map((t) => {
+        if (t.id === id) { oldTask = t; return { ...t, ...updates }; }
+        return t;
+      });
+      return updated;
+    });
 
     if (isConfigured) {
       const row = {};
@@ -181,6 +258,7 @@ export function useTaskStore(projectId) {
       if (updates.assignees !== undefined) row.assignees = updates.assignees;
 
       if (Object.keys(row).length > 0) {
+        recentlyWrittenRef.current.set(id, Date.now());
         markSaving();
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = setTimeout(() => {
@@ -191,13 +269,18 @@ export function useTaskStore(projectId) {
             .then(() => {
               touchProject();
               markSaved();
+              if (oldTask) {
+                const changed = diffFields(oldTask, updates);
+                if (changed) recordHistory('update', { ...oldTask, ...updates }, changed);
+              }
             });
         }, 300);
       }
     }
-  }, [touchProject, markSaving, markSaved]);
+  }, [touchProject, markSaving, markSaved, recordHistory]);
 
-  const beginDrag = useCallback(() => {
+  const beginDrag = useCallback((taskId) => {
+    draggingTaskIdRef.current = taskId || null;
     setTasks((current) => {
       dragSnapshotRef.current = current;
       return current;
@@ -269,6 +352,7 @@ export function useTaskStore(projectId) {
   const endDrag = useCallback(() => {
     const snapshot = dragSnapshotRef.current;
     dragSnapshotRef.current = null;
+    draggingTaskIdRef.current = null;
 
     if (!snapshot || !isConfigured) return;
 
@@ -279,37 +363,49 @@ export function useTaskStore(projectId) {
       });
 
       for (const task of changes) {
+        recentlyWrittenRef.current.set(task.id, Date.now());
+        const orig = snapshot.find((s) => s.id === task.id);
         supabase
           .from('tasks')
           .update({ start_date: task.start, end_date: task.end })
           .eq('id', task.id)
-          .then(() => {});
+          .then(() => {
+            recordHistory('move', task, {
+              dates: { from: { start: orig.start, end: orig.end }, to: { start: task.start, end: task.end } }
+            });
+          });
       }
 
       if (changes.length > 0) touchProject();
       return current;
     });
-  }, [touchProject]);
+  }, [touchProject, recordHistory]);
 
   const deleteTask = useCallback((id) => {
     taskCountRef.current = Math.max(0, taskCountRef.current - 1);
-    setTasks((prev) =>
-      prev
+    let deletedTask = null;
+    setTasks((prev) => {
+      deletedTask = prev.find(t => t.id === id) || null;
+      return prev
         .filter((t) => t.id !== id)
         .map((t) => ({
           ...t,
           dependencies: t.dependencies.filter((d) => d !== id),
-        }))
-    );
+        }));
+    });
 
     if (isConfigured) {
+      recentlyWrittenRef.current.set(id, Date.now());
       supabase
         .from('tasks')
         .delete()
         .eq('id', id)
-        .then(() => touchProject());
+        .then(() => {
+          touchProject();
+          if (deletedTask) recordHistory('delete', deletedTask);
+        });
     }
-  }, [touchProject]);
+  }, [touchProject, recordHistory]);
 
   const reorderTasks = useCallback((fromIndex, toIndex) => {
     setTasks((prev) => {
