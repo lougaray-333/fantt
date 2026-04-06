@@ -57,7 +57,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     onRemoteChange: () => history.clear(),
   });
   const { theme, toggleTheme } = useTheme();
-  const { otherCount } = usePresence(projectId, email || 'Collaborator');
+  const { others } = usePresence(projectId, email || 'Collaborator');
   const [viewMode, setViewMode] = useState('day');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -648,11 +648,65 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <History size={13} />
           </button>
 
-          {/* Presence badge */}
-          {otherCount > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-green-500/15 px-2.5 py-1 text-[10px] font-semibold text-green-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-              {otherCount} other{otherCount !== 1 ? 's' : ''} editing
+          {/* Presence avatars */}
+          {others.length > 0 && (
+            <div className="flex items-center" style={{ gap: 0 }}>
+              {others.slice(0, 5).map((user, i) => {
+                const label = user.identity || 'Collaborator';
+                const initials = label.includes('@')
+                  ? label[0].toUpperCase()
+                  : label.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                // Cycle through a set of distinct colors per avatar
+                const colors = [
+                  { bg: '#4f8ef7', text: '#fff' },
+                  { bg: '#f7874f', text: '#fff' },
+                  { bg: '#7c4ff7', text: '#fff' },
+                  { bg: '#2db87e', text: '#fff' },
+                  { bg: '#f7c94f', text: '#000' },
+                ];
+                const c = colors[i % colors.length];
+                return (
+                  <div
+                    key={user.key}
+                    title={label}
+                    style={{
+                      width: 26, height: 26,
+                      borderRadius: '50%',
+                      background: c.bg,
+                      color: c.text,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid var(--color-bg)',
+                      marginLeft: i === 0 ? 0 : -6,
+                      zIndex: others.length - i,
+                      position: 'relative',
+                      cursor: 'default',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {initials}
+                  </div>
+                );
+              })}
+              {others.length > 5 && (
+                <div
+                  title={`${others.length - 5} more`}
+                  style={{
+                    width: 26, height: 26,
+                    borderRadius: '50%',
+                    background: 'var(--color-bg-alt)',
+                    color: 'var(--color-text-muted)',
+                    fontSize: 9, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '2px solid var(--color-bg)',
+                    marginLeft: -6, position: 'relative', zIndex: 0,
+                    flexShrink: 0,
+                  }}
+                >
+                  +{others.length - 5}
+                </div>
+              )}
             </div>
           )}
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
 
 export function usePresence(projectId, identity) {
-  const [otherCount, setOtherCount] = useState(0);
+  const [others, setOthers] = useState([]); // [{ key, identity }]
   const myKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
@@ -13,8 +13,14 @@ export function usePresence(projectId, identity) {
     });
 
     ch.on('presence', { event: 'sync' }, () => {
-      const count = Object.keys(ch.presenceState()).length;
-      setOtherCount(Math.max(0, count - 1));
+      const state = ch.presenceState();
+      const list = Object.entries(state)
+        .filter(([key]) => key !== myKey.current)
+        .map(([key, presences]) => ({
+          key,
+          identity: presences[0]?.identity || 'Collaborator',
+        }));
+      setOthers(list);
     }).subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await ch.track({ identity: identity || 'Collaborator', at: Date.now() });
@@ -24,5 +30,5 @@ export function usePresence(projectId, identity) {
     return () => { supabase.removeChannel(ch); };
   }, [projectId, identity]);
 
-  return { otherCount };
+  return { others };
 }
