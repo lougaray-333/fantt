@@ -254,7 +254,7 @@ export default memo(function ResourceGrid({
   );
 
   return (
-    <div ref={wrapperRef} className="shrink-0 border-t border-border bg-sidebar flex flex-col relative z-10">
+    <div ref={wrapperRef} className="flex flex-col h-full border-t border-border bg-sidebar relative z-10">
       {/* Collapse bar */}
       <div className="flex w-full items-center gap-2 px-4 py-2 shrink-0 relative">
         <button
@@ -377,12 +377,11 @@ export default memo(function ResourceGrid({
       </div>
 
       {!collapsed && (
-        <div className="border-t border-border flex flex-col bg-sidebar">
+        <div className="border-t border-border flex flex-col flex-1 min-h-0 bg-sidebar">
           {/* Single scroll container — horizontal scroll driven by Gantt chart */}
           <div
             ref={resourceScrollRef}
-            className="overflow-y-auto overflow-x-hidden bg-sidebar"
-            style={{ maxHeight: 300 }}
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-sidebar"
           >
             <div style={{ width: totalWidth, minWidth: '100%' }}>
               {/* Header row — sticky top */}

@@ -73,6 +73,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
     try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
   });
   const [budgetCollapsed, setBudgetCollapsed] = useState(false);
+  const [splitPct, setSplitPct] = useState(50);
+  const splitContainerRef = useRef(null);
   // Sync resource grid scroll to gantt when budget expands
   const prevCollapsedRef = useRef(budgetCollapsed);
   useEffect(() => {
@@ -209,6 +211,23 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const handleGanttScroll = useCallback((scrollLeft) => {
     const el = resourceScrollRef.current;
     if (el) el.scrollLeft = scrollLeft;
+  }, []);
+
+  const handleResizerDown = useCallback((e) => {
+    e.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const onMove = (ev) => {
+      const rect = container.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((ev.clientY - rect.top) / rect.height) * 100));
+      setSplitPct(pct);
+    };
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, []);
 
   const handleHideRole = useCallback((role) => {
@@ -652,8 +671,12 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col min-h-0">
-          <div ref={ganttScrollRef} className="flex flex-1 overflow-auto min-h-0 items-start">
+        <div ref={splitContainerRef} className="flex flex-1 flex-col min-h-0">
+          <div
+            ref={ganttScrollRef}
+            className={`flex overflow-auto items-start ${budgetCollapsed ? 'flex-1' : 'shrink-0'}`}
+            style={budgetCollapsed ? {} : { height: `${splitPct}%` }}
+          >
             <InlineTaskTable
               tasks={store.tasks}
               viewMode={viewMode}
@@ -719,6 +742,18 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               }}
             />
           </div>
+          {/* Drag resizer — only visible when resource panel is expanded */}
+          {!budgetCollapsed && (
+            <div
+              className="h-1.5 shrink-0 cursor-ns-resize bg-border/40 hover:bg-accent/40 active:bg-accent/60 transition-colors select-none"
+              onPointerDown={handleResizerDown}
+            />
+          )}
+
+          <div
+            className={`flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
+            style={budgetCollapsed ? {} : { height: `calc(${100 - splitPct}% - 6px)` }}
+          >
           <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
@@ -743,6 +778,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
               highlightedDate={highlightedDate}
               onDateClick={setHighlightedDate}
             />
+          </div>
         </div>
       )}
 
