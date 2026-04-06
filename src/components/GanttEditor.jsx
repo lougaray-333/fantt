@@ -617,69 +617,108 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           </button>
 
           {/* Collaborator avatars */}
-          {others.length > 0 && (
-            <div className="flex items-center" style={{ gap: 0 }}>
-              {others.slice(0, 5).map((user, i) => {
-                const label = user.identity || 'Collaborator';
-                const initials = (() => {
-                  try {
-                    const local = label.includes('@') ? label.split('@')[0] : label;
-                    const parts = local.split(/[.\-_\s]+/).filter(Boolean);
-                    const result = parts.length >= 2
-                      ? (parts[0][0] + parts[1][0]).toUpperCase()
-                      : parts[0]?.[0]?.toUpperCase() || '?';
-                    return result || label[0].toUpperCase();
-                  } catch { return label[0]?.toUpperCase() || '?'; }
-                })();
-                const colors = [
-                  { bg: '#4f8ef7', text: '#fff' },
-                  { bg: '#f7874f', text: '#fff' },
-                  { bg: '#7c4ff7', text: '#fff' },
-                  { bg: '#2db87e', text: '#fff' },
-                  { bg: '#f7c94f', text: '#000' },
-                ];
-                const c = colors[i % colors.length];
-                return (
+          {others.length > 0 && (() => {
+            const MAX_VISIBLE = 3;
+            const avatarColors = [
+              { bg: '#4f8ef7', text: '#fff' },
+              { bg: '#f7874f', text: '#fff' },
+              { bg: '#7c4ff7', text: '#fff' },
+              { bg: '#2db87e', text: '#fff' },
+              { bg: '#f7c94f', text: '#000' },
+            ];
+            const getInitials = (label) => {
+              try {
+                const local = label.includes('@') ? label.split('@')[0] : label;
+                const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+                const result = parts.length >= 2
+                  ? (parts[0][0] + parts[1][0]).toUpperCase()
+                  : parts[0]?.[0]?.toUpperCase() || '?';
+                return result || label[0].toUpperCase();
+              } catch { return label[0]?.toUpperCase() || '?'; }
+            };
+            const overflow = others.length - MAX_VISIBLE;
+            return (
+              <div className="group relative flex items-center" style={{ gap: 0 }}>
+                {/* Stacked circles — max 3 visible */}
+                {others.slice(0, MAX_VISIBLE).map((user, i) => {
+                  const label = user.identity || 'Collaborator';
+                  const c = avatarColors[i % avatarColors.length];
+                  return (
+                    <div
+                      key={user.key}
+                      style={{
+                        width: 26, height: 26,
+                        borderRadius: '50%',
+                        background: c.bg,
+                        color: c.text,
+                        fontSize: 10, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '2px solid var(--color-bg)',
+                        marginLeft: i === 0 ? 0 : -8,
+                        zIndex: MAX_VISIBLE - i,
+                        position: 'relative',
+                        cursor: 'default', flexShrink: 0,
+                      }}
+                    >
+                      {getInitials(label)}
+                    </div>
+                  );
+                })}
+                {overflow > 0 && (
                   <div
-                    key={user.key}
-                    title={label}
                     style={{
                       width: 26, height: 26,
                       borderRadius: '50%',
-                      background: c.bg,
-                      color: c.text,
-                      fontSize: 10, fontWeight: 700,
+                      background: 'var(--color-bg-alt)',
+                      color: 'var(--color-text-muted)',
+                      fontSize: 9, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       border: '2px solid var(--color-bg)',
-                      marginLeft: i === 0 ? 0 : -6,
-                      zIndex: others.length - i,
-                      position: 'relative',
-                      cursor: 'default', flexShrink: 0,
+                      marginLeft: -8, position: 'relative', zIndex: 0, flexShrink: 0,
+                      cursor: 'default',
                     }}
                   >
-                    {initials}
+                    +{overflow}
                   </div>
-                );
-              })}
-              {others.length > 5 && (
-                <div
-                  title={`${others.length - 5} more`}
-                  style={{
-                    width: 26, height: 26,
-                    borderRadius: '50%',
-                    background: 'var(--color-bg-alt)',
-                    color: 'var(--color-text-muted)',
-                    fontSize: 9, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '2px solid var(--color-bg)',
-                    marginLeft: -6, position: 'relative', zIndex: 0, flexShrink: 0,
-                  }}
-                >
-                  +{others.length - 5}
+                )}
+
+                {/* Hover popover — shows everyone in the file */}
+                <div className="pointer-events-none absolute bottom-full right-0 mb-2.5 hidden group-hover:block z-50">
+                  <div className="rounded-lg border border-border bg-sidebar shadow-xl px-3 py-2.5 min-w-[160px]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted/60 mb-2">
+                      In this file
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {others.map((user, i) => {
+                        const label = user.identity || 'Collaborator';
+                        const c = avatarColors[i % avatarColors.length];
+                        return (
+                          <div key={user.key} className="flex items-center gap-2">
+                            <div
+                              style={{
+                                width: 20, height: 20,
+                                borderRadius: '50%',
+                                background: c.bg,
+                                color: c.text,
+                                fontSize: 9, fontWeight: 700,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {getInitials(label)}
+                            </div>
+                            <span className="text-xs text-text truncate max-w-[140px]">{label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Arrow */}
+                  <div className="absolute -bottom-1.5 right-4 w-3 h-3 rotate-45 border-b border-r border-border bg-sidebar" />
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
           {/* You avatar — shows your initials; tooltip has email + save status */}
           {email && (() => {
