@@ -534,7 +534,6 @@ export default memo(function GanttChart({
                   strokeWidth={1}
                   strokeLinejoin="round"
                 />
-                <circle cx={fromX} cy={fromY} r={2.5} fill="var(--color-text-muted)" />
                 <circle cx={toX} cy={toY} r={2.5} fill="var(--color-text-muted)" />
               </g>
             );
