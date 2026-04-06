@@ -87,6 +87,8 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
   const lastAnimatedRef = useRef(0);
   const recentlyWrittenRef = useRef(new Map()); // taskId → timestamp, for self-filtering realtime events
   const draggingTaskIdRef = useRef(null);        // task being dragged, skip its remote updates
+  const onRemoteChangeRef = useRef(onRemoteChange);
+  useEffect(() => { onRemoteChangeRef.current = onRemoteChange; }, [onRemoteChange]);
 
   const markSaving = useCallback(() => {
     const now = Date.now();
@@ -183,7 +185,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
               setTasks(prev => prev.filter(t => t.id !== id));
             }
 
-            onRemoteChange?.();
+            onRemoteChangeRef.current?.();
           })
           .subscribe();
       });
@@ -192,7 +194,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [projectId, onRemoteChange]);
+  }, [projectId]);
 
   // Touch project's updated_at
   const touchProject = useCallback(() => {
