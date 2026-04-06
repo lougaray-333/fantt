@@ -2,14 +2,25 @@ import { useState, useEffect } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import { supabase, isConfigured } from '../lib/supabase';
 
-function relativeTime(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
+function formatTimestamp(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now - d;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+
+  const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  let dateLabel;
+  if (mins < 1) dateLabel = 'just now';
+  else if (isToday) dateLabel = `Today · ${timeStr}`;
+  else if (isYesterday) dateLabel = `Yesterday · ${timeStr}`;
+  else dateLabel = `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} · ${timeStr}`;
+
+  return dateLabel;
 }
 
 function avatarInitials(name) {
@@ -107,7 +118,11 @@ export default function ChangeHistory({ projectId, onClose, onRevert }) {
           ) : (
             <ul className="divide-y divide-border">
               {entries.map((entry) => (
-                <li key={entry.id} className="group px-4 py-3">
+                <li
+                  key={entry.id}
+                  className={`group px-4 py-3 ${entry.task_snapshot ? 'cursor-pointer hover:bg-bg-alt transition' : ''}`}
+                  onClick={() => entry.task_snapshot && confirmId !== entry.id && setConfirmId(entry.id)}
+                >
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
                     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[10px] font-bold text-accent">
@@ -123,24 +138,17 @@ export default function ChangeHistory({ projectId, onClose, onRevert }) {
                       {entry.task_name && (
                         <p className="text-[11px] text-text-muted truncate mt-0.5">"{entry.task_name}"</p>
                       )}
-                      <p className="text-[10px] text-text-muted/60 mt-0.5">{relativeTime(entry.changed_at)}</p>
+                      <p className="text-[10px] text-text-muted/60 mt-0.5">{formatTimestamp(entry.changed_at)}</p>
                     </div>
-                    {/* Revert button — visible on hover if snapshot exists */}
                     {entry.task_snapshot && confirmId !== entry.id && (
-                      <button
-                        onClick={() => setConfirmId(entry.id)}
-                        className="opacity-0 group-hover:opacity-100 shrink-0 rounded p-1 text-text-muted hover:text-accent transition"
-                        title="Revert to this state"
-                      >
-                        <RotateCcw size={13} />
-                      </button>
+                      <RotateCcw size={13} className="opacity-0 group-hover:opacity-100 shrink-0 text-text-muted mt-0.5 transition" />
                     )}
                   </div>
 
                   {/* Inline confirm */}
                   {confirmId === entry.id && (
-                    <div className="mt-2 ml-9 flex items-center gap-2">
-                      <span className="text-[11px] text-text-muted">Restore project to this state?</span>
+                    <div className="mt-2 ml-9 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[11px] text-text-muted">Restore to this state?</span>
                       <button
                         onClick={() => handleRevert(entry)}
                         className="rounded px-2 py-0.5 text-[11px] font-semibold bg-accent text-white hover:opacity-90 transition"
