@@ -515,8 +515,10 @@ export default memo(function GanttChart({
             const fromY = depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
             const toX = dayToX(task.start);
             const toY = i * ROW_HEIGHT + ROW_HEIGHT / 2;
-            const dx = Math.max(40, Math.abs(toX - fromX) * 0.5);
-            const d = `M${fromX},${fromY} C${fromX + dx},${fromY} ${toX - dx},${toY} ${toX},${toY}`;
+            const span = Math.abs(toX - fromX);
+            const cp1x = fromX + Math.max(20, span * 0.25);
+            const cp2x = toX - Math.max(20, span * 0.55);
+            const d = `M${fromX},${fromY} C${cp1x},${fromY} ${cp2x},${toY} ${toX},${toY}`;
 
             return (
               <g key={`dep-${dep.id}-${task.id}`} opacity={0.4} style={{ pointerEvents: 'none' }}>
