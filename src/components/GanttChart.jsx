@@ -469,7 +469,7 @@ export default memo(function GanttChart({
         {showToday && (
           <>
             <rect x={todayX} y={0} width={colWidth} height={bodyHeight} fill="var(--color-accent)" fillOpacity={0.06} />
-            <line x1={todayX + colWidth / 2} y1={0} x2={todayX + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.4} />
+            <line x1={todayX + colWidth / 2} y1={0} x2={todayX + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1.5} strokeOpacity={0.75} />
           </>
         )}
 
@@ -480,7 +480,7 @@ export default memo(function GanttChart({
           return (
             <>
               <rect x={hx} y={0} width={colWidth} height={bodyHeight} fill="var(--color-accent)" fillOpacity={0.06} style={{ pointerEvents: 'none' }} />
-              <line x1={hx + colWidth / 2} y1={0} x2={hx + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1} strokeOpacity={0.4} style={{ pointerEvents: 'none' }} />
+              <line x1={hx + colWidth / 2} y1={0} x2={hx + colWidth / 2} y2={bodyHeight} stroke="var(--color-accent)" strokeWidth={1.5} strokeOpacity={0.75} style={{ pointerEvents: 'none' }} />
             </>
           );
         })()}
