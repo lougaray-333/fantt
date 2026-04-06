@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import AuthGate from './components/AuthGate';
 import AppLoader from './components/AppLoader';
+import PasswordGate, { isSiteAuthed } from './components/PasswordGate';
 const GanttEditor = lazy(() => import('./components/GanttEditor'));
 const ProjectDashboard = lazy(() => import('./components/ProjectDashboard'));
 import { useProjects } from './hooks/useProjects';
@@ -24,6 +25,7 @@ function LoadingSpinner() {
 }
 
 export default function App() {
+  const [siteAuthed, setSiteAuthed] = useState(() => isSiteAuthed());
   const [loaderDone, setLoaderDone] = useState(false);
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {
@@ -98,6 +100,12 @@ export default function App() {
       // stay on dashboard
     }
   };
+
+  // Password gate — skip for public share/edit links so clients aren't blocked
+  const isPublicRoute = hash.startsWith('#/share/') || hash.startsWith('#/edit/');
+  if (!siteAuthed && !isPublicRoute) {
+    return <PasswordGate onAuthed={() => setSiteAuthed(true)} />;
+  }
 
   // Skip loader for shared/godmode/edit routes — show it only for main app
   const isSpecialRoute = hash.startsWith('#/share/') || hash.startsWith('#/edit/') || hash === '#/godmode';

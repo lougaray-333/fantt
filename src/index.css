@@ -55,7 +55,7 @@ body {
 
 /* Drag handle — hidden by default, appears on row hover */
 .task-drag-handle { opacity: 0; transition: opacity 0.15s ease; }
-.gantt-task-bar:hover .task-drag-handle { opacity: 0.35; }
+.task-reorder-zone:hover .task-drag-handle { opacity: 0.35; }
 
 /* Micro-animations */
 
@@ -161,4 +161,15 @@ body {
   from { clip-path: inset(0 100% 0 0); opacity: 0; }
   10%  { opacity: 1; }
   to   { clip-path: inset(0 0% 0 0); opacity: 1; }
+}
+
+/* Password gate — wrong password shake */
+@keyframes fantt-shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-8px); }
+  30%  { transform: translateX(7px); }
+  45%  { transform: translateX(-5px); }
+  60%  { transform: translateX(4px); }
+  75%  { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
 }
