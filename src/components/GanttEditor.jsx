@@ -967,7 +967,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       {/* Auto-save toast */}
       {autoSaveToast && (
         <div
-          className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
           style={{
             animation: autoSaveToast === 'in'
               ? 'fantt-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
