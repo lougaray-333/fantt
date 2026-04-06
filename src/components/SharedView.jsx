@@ -111,7 +111,13 @@ export default function SharedView({ token }) {
   if (status === 'invalid') {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-bg text-center px-4">
-        <FanttLogo size={32} />
+        <div className="flex flex-col items-center leading-none gap-0.5 mb-1">
+          <span className="text-base font-bold tracking-tight text-text">Fantt Chart</span>
+          <div className="flex items-center gap-1">
+            <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
+            <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>
+          </div>
+        </div>
         <p className="text-sm font-semibold text-text">This link is no longer active</p>
         <p className="text-xs text-text-muted max-w-xs">
           The project owner may have disabled or regenerated this link.
@@ -123,13 +129,16 @@ export default function SharedView({ token }) {
   return (
     <div className="flex h-screen flex-col bg-bg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-5 py-3 shrink-0 bg-sidebar">
-        <div className="flex items-center gap-2.5">
-          <FanttLogo size={20} />
-          <span className="text-sm font-bold text-text">Fantt Chart</span>
+      <div className="flex items-center justify-between border-b border-border px-5 py-2 shrink-0 bg-sidebar">
+        <div className="flex flex-col leading-none gap-0.5">
+          <span className="text-sm font-bold tracking-tight text-text">Fantt Chart</span>
+          <div className="flex items-center gap-1">
+            <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
+            <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>
+          </div>
         </div>
         {project?.name && (
-          <span className="text-sm font-medium text-text-muted">{project.name}</span>
+          <span className="text-sm font-medium text-text-muted truncate max-w-[40%] text-center">{project.name}</span>
         )}
         <span className="text-xs text-text-muted/50 hidden sm:block">View only</span>
       </div>
