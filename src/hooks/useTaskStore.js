@@ -420,7 +420,9 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       const reordered = next.map((t, i) => ({ ...t, sortOrder: i }));
 
       if (isConfigured) {
+        const now = Date.now();
         for (const t of reordered) {
+          recentlyWrittenRef.current.set(t.id, now);
           supabase
             .from('tasks')
             .update({ sort_order: t.sortOrder })
@@ -435,6 +437,10 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
 
   const importTasks = useCallback(async (newTasks, mode = 'replace') => {
     if (mode === 'replace') {
+      const now = Date.now();
+      // Mark existing tasks (DELETE events) and new tasks (INSERT events)
+      for (const t of tasksRef.current) recentlyWrittenRef.current.set(t.id, now);
+
       if (isConfigured) {
         await supabase.from('tasks').delete().eq('project_id', projectId);
       }
@@ -444,6 +450,8 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
         id: t.id || crypto.randomUUID(),
         sortOrder: i,
       }));
+
+      for (const t of tasksWithIds) recentlyWrittenRef.current.set(t.id, now);
 
       if (isConfigured) {
         const rows = tasksWithIds.map((t) => taskToRow(t, projectId));
@@ -462,6 +470,8 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
         }));
 
         if (isConfigured) {
+          const now = Date.now();
+          for (const t of tasksWithIds) recentlyWrittenRef.current.set(t.id, now);
           const rows = tasksWithIds.map((t) => taskToRow(t, projectId));
           supabase.from('tasks').insert(rows).then(() => touchProject());
         }
@@ -475,6 +485,10 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
     taskCountRef.current = newTasks.length;
     setTasks(newTasks);
     if (isConfigured && projectId) {
+      // Mark all current and incoming task IDs so realtime echoes are suppressed
+      const now = Date.now();
+      for (const t of tasksRef.current) recentlyWrittenRef.current.set(t.id, now);
+      for (const t of newTasks) recentlyWrittenRef.current.set(t.id, now);
       // Delete all project tasks and re-insert
       supabase
         .from('tasks')
