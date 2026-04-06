@@ -2,6 +2,23 @@ import { useState } from 'react';
 import { Bug, X, Send, Loader2, Check } from 'lucide-react';
 import { supabase, isConfigured } from '../lib/supabase';
 
+function playBugClick() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(280, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.18);
+  } catch (_) {}
+}
+
 export default function BugReportButton() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +65,7 @@ export default function BugReportButton() {
     <>
       {/* Floating bug button */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { playBugClick(); setOpen(true); }}
         className="fixed bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-sidebar shadow-lg text-text-muted hover:text-accent hover:border-accent transition"
         title="Report a bug"
       >
