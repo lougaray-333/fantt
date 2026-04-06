@@ -18,6 +18,7 @@ export default memo(function GanttChart({
   onTaskClick,
   onTaskUpdate,
   onBeginDrag,
+  onBeginResize,
   onDragMove,
   onEndDrag,
   onReorder,
@@ -208,6 +209,7 @@ export default memo(function GanttChart({
       didDragRef.current = false;
 
       if (type === 'move') onBeginDrag(task.id);
+      if (type === 'resize-start' || type === 'resize-end') onBeginResize?.();
 
       function onMove(ev) {
         const dx = ev.clientX - startX;
@@ -268,7 +270,7 @@ export default memo(function GanttChart({
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    [colWidth, onTaskUpdate, onBeginDrag, onDragMove, onEndDrag, onResizeEnd, onMoveEnd, skipWeekends]
+    [colWidth, onTaskUpdate, onBeginDrag, onBeginResize, onDragMove, onEndDrag, onResizeEnd, onMoveEnd, skipWeekends]
   );
 
   // Vertical drag (reorder rows)

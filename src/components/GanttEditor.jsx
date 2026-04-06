@@ -813,8 +813,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                   handleSelect(id, false);
                 }
               }}
-              onTaskUpdate={(id, updates) => { snap(); store.updateTask(id, updates); }}
+              onTaskUpdate={(id, updates) => { store.updateTask(id, updates); }}
               onBeginDrag={(taskId) => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(taskId); }}
+              onBeginResize={() => snap()}
               onDragMove={(taskId, daysDelta) => {
                 if (!dragRefDateRef.current) {
                   const task = store.tasks.find(t => t.id === taskId);
