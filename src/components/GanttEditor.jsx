@@ -72,7 +72,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack }) {
   const [roleNames, setRoleNames] = useState(() => {
     try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
   });
-  const [budgetCollapsed, setBudgetCollapsed] = useState(false);
+  const [budgetCollapsed, setBudgetCollapsed] = useState(true);
   const [splitPct, setSplitPct] = useState(50);
   const splitContainerRef = useRef(null);
   // Sync resource grid scroll to gantt when budget expands
