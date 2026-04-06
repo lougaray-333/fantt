@@ -515,15 +515,8 @@ export default memo(function GanttChart({
             const fromY = depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
             const toX = dayToX(task.start);
             const toY = i * ROW_HEIGHT + ROW_HEIGHT / 2;
-            const gap = 8;
-            const cornerX = fromX + gap;
-            const d = toX > fromX + gap * 2
-              ? `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${toY} L${toX},${toY}`
-              : `M${fromX},${fromY} L${cornerX},${fromY} L${cornerX},${
-                  fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
-                } L${toX - gap},${
-                  fromY + (toY > fromY ? ROW_HEIGHT / 2 + 4 : -(ROW_HEIGHT / 2 + 4))
-                } L${toX - gap},${toY} L${toX},${toY}`;
+            const dx = Math.max(40, Math.abs(toX - fromX) * 0.5);
+            const d = `M${fromX},${fromY} C${fromX + dx},${fromY} ${toX - dx},${toY} ${toX},${toY}`;
 
             return (
               <g key={`dep-${dep.id}-${task.id}`} opacity={0.4} style={{ pointerEvents: 'none' }}>
@@ -619,11 +612,13 @@ export default memo(function GanttChart({
                 </text>
 
                 {/* Reorder handle */}
-                <rect x={mx - ds - 14} y={my - ds + 4} width={12} height={2 * ds - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
-                <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
-                  <line x1={mx - ds - 12} y1={my - 4} x2={mx - ds - 4} y2={my - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
-                  <line x1={mx - ds - 12} y1={my}     x2={mx - ds - 4} y2={my}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
-                  <line x1={mx - ds - 12} y1={my + 4} x2={mx - ds - 4} y2={my + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                <g className="task-reorder-zone">
+                  <rect x={mx - ds - 14} y={my - ds + 4} width={12} height={2 * ds - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
+                  <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
+                    <line x1={mx - ds - 12} y1={my - 4} x2={mx - ds - 4} y2={my - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                    <line x1={mx - ds - 12} y1={my}     x2={mx - ds - 4} y2={my}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                    <line x1={mx - ds - 12} y1={my + 4} x2={mx - ds - 4} y2={my + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                  </g>
                 </g>
 
                 {/* Move handle (covers diamond) — no resize handles */}
@@ -665,11 +660,13 @@ export default memo(function GanttChart({
                 </text>
               )}
 
-              <rect x={x - 14} y={y + 4} width={12} height={BAR_HEIGHT - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
-              <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
-                <line x1={x - 12} y1={y + BAR_HEIGHT / 2 - 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
-                <line x1={x - 12} y1={y + BAR_HEIGHT / 2}     x2={x - 4} y2={y + BAR_HEIGHT / 2}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
-                <line x1={x - 12} y1={y + BAR_HEIGHT / 2 + 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+              <g className="task-reorder-zone">
+                <rect x={x - 14} y={y + 4} width={12} height={BAR_HEIGHT - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
+                <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
+                  <line x1={x - 12} y1={y + BAR_HEIGHT / 2 - 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                  <line x1={x - 12} y1={y + BAR_HEIGHT / 2}     x2={x - 4} y2={y + BAR_HEIGHT / 2}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                  <line x1={x - 12} y1={y + BAR_HEIGHT / 2 + 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                </g>
               </g>
 
               <rect x={x + 8} y={y} width={Math.max(barWidth - 16, 4)} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'grab' }}
