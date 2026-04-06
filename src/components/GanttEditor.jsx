@@ -895,7 +895,11 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       {/* Change history panel */}
       {historyOpen && (
         <Suspense fallback={null}>
-          <ChangeHistory projectId={projectId} onClose={() => setHistoryOpen(false)} />
+          <ChangeHistory
+            projectId={projectId}
+            onClose={() => setHistoryOpen(false)}
+            onRevert={(snapshot) => { snap(); store.setTasksDirect(snapshot); }}
+          />
         </Suspense>
       )}
 

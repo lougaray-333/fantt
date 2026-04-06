@@ -89,6 +89,8 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
   const draggingTaskIdRef = useRef(null);        // task being dragged, skip its remote updates
   const onRemoteChangeRef = useRef(onRemoteChange);
   useEffect(() => { onRemoteChangeRef.current = onRemoteChange; }, [onRemoteChange]);
+  const tasksRef = useRef([]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
   const markSaving = useCallback(() => {
     const now = Date.now();
@@ -112,7 +114,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
     }
   }, [tasks]);
 
-  // Fire-and-forget history write
+  // Fire-and-forget history write — captures current tasks as a restorable snapshot
   const recordHistory = useCallback((type, task, changedFields = null) => {
     if (!isConfigured || !projectId) return;
     supabase.from('task_history').insert({
@@ -122,6 +124,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       change_type: type,
       changed_fields: changedFields,
       changed_by: identity || 'Unknown',
+      task_snapshot: tasksRef.current,
     }).then(() => {});
   }, [projectId, identity]);
 

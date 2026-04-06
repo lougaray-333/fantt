@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, RotateCcw } from 'lucide-react';
 import { supabase, isConfigured } from '../lib/supabase';
 
 function relativeTime(dateStr) {
@@ -12,10 +12,15 @@ function relativeTime(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function initials(name) {
+function avatarInitials(name) {
   if (!name) return '?';
-  const parts = name.split(/[\s@.]+/).filter(Boolean);
-  return (parts[0]?.[0] || '?').toUpperCase();
+  try {
+    const local = name.includes('@') ? name.split('@')[0] : name;
+    const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : parts[0]?.[0]?.toUpperCase() || '?';
+  } catch { return name[0]?.toUpperCase() || '?'; }
 }
 
 function describeChange(entry) {
@@ -28,15 +33,15 @@ function describeChange(entry) {
     return 'moved';
   }
   if (change_type === 'update' && changed_fields) {
-    const fields = Object.keys(changed_fields).join(', ');
-    return `updated ${fields}`;
+    return `updated ${Object.keys(changed_fields).join(', ')}`;
   }
   return change_type;
 }
 
-export default function ChangeHistory({ projectId, onClose }) {
+export default function ChangeHistory({ projectId, onClose, onRevert }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmId, setConfirmId] = useState(null); // entry id awaiting revert confirm
 
   useEffect(() => {
     if (!isConfigured || !projectId) { setLoading(false); return; }
@@ -47,18 +52,12 @@ export default function ChangeHistory({ projectId, onClose }) {
       .eq('project_id', projectId)
       .order('changed_at', { ascending: false })
       .limit(50)
-      .then(({ data }) => {
-        setEntries(data || []);
-        setLoading(false);
-      });
+      .then(({ data }) => { setEntries(data || []); setLoading(false); });
 
-    // Subscribe to new history entries in real time
     const ch = supabase
       .channel(`history:${projectId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'task_history',
+        event: 'INSERT', schema: 'public', table: 'task_history',
         filter: `project_id=eq.${projectId}`,
       }, ({ new: row }) => {
         setEntries(prev => [row, ...prev].slice(0, 50));
@@ -68,16 +67,20 @@ export default function ChangeHistory({ projectId, onClose }) {
     return () => supabase.removeChannel(ch);
   }, [projectId]);
 
+  function handleRevert(entry) {
+    if (!entry.task_snapshot) return;
+    onRevert(entry.task_snapshot);
+    setConfirmId(null);
+    onClose();
+  }
+
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40"
         onClick={onClose}
         style={{ animation: 'fantt-backdrop-in 0.25s ease-out forwards' }}
       />
-
-      {/* Panel */}
       <div
         className="fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border bg-sidebar shadow-xl"
         style={{ animation: 'fantt-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
@@ -99,28 +102,59 @@ export default function ChangeHistory({ projectId, onClose }) {
           ) : entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
               <p className="text-sm text-text-muted">No changes recorded yet.</p>
-              <p className="text-xs text-text-muted/60">Changes appear here as you and collaborators edit the project.</p>
+              <p className="text-xs text-text-muted/60">Changes appear here as you and collaborators edit.</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
               {entries.map((entry) => (
-                <li key={entry.id} className="flex items-start gap-3 px-4 py-3">
-                  {/* Avatar */}
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[10px] font-bold text-accent">
-                    {initials(entry.changed_by)}
-                  </div>
-                  {/* Content */}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-text leading-snug">
-                      <span className="font-semibold">{entry.changed_by || 'Unknown'}</span>
-                      {' · '}
-                      {describeChange(entry)}
-                    </p>
-                    {entry.task_name && (
-                      <p className="text-[11px] text-text-muted truncate mt-0.5">"{entry.task_name}"</p>
+                <li key={entry.id} className="group px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[10px] font-bold text-accent">
+                      {avatarInitials(entry.changed_by)}
+                    </div>
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-text leading-snug">
+                        <span className="font-semibold">{entry.changed_by || 'Unknown'}</span>
+                        {' · '}
+                        {describeChange(entry)}
+                      </p>
+                      {entry.task_name && (
+                        <p className="text-[11px] text-text-muted truncate mt-0.5">"{entry.task_name}"</p>
+                      )}
+                      <p className="text-[10px] text-text-muted/60 mt-0.5">{relativeTime(entry.changed_at)}</p>
+                    </div>
+                    {/* Revert button — visible on hover if snapshot exists */}
+                    {entry.task_snapshot && confirmId !== entry.id && (
+                      <button
+                        onClick={() => setConfirmId(entry.id)}
+                        className="opacity-0 group-hover:opacity-100 shrink-0 rounded p-1 text-text-muted hover:text-accent transition"
+                        title="Revert to this state"
+                      >
+                        <RotateCcw size={13} />
+                      </button>
                     )}
-                    <p className="text-[10px] text-text-muted/60 mt-0.5">{relativeTime(entry.changed_at)}</p>
                   </div>
+
+                  {/* Inline confirm */}
+                  {confirmId === entry.id && (
+                    <div className="mt-2 ml-9 flex items-center gap-2">
+                      <span className="text-[11px] text-text-muted">Restore project to this state?</span>
+                      <button
+                        onClick={() => handleRevert(entry)}
+                        className="rounded px-2 py-0.5 text-[11px] font-semibold bg-accent text-white hover:opacity-90 transition"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => setConfirmId(null)}
+                        className="rounded px-2 py-0.5 text-[11px] text-text-muted hover:bg-bg-alt transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
