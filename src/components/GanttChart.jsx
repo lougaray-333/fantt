@@ -594,6 +594,7 @@ export default memo(function GanttChart({
             return (
               <g
                 key={`bar-${task.id}`}
+                className="gantt-task-bar"
                 style={animStyle}
                 onAnimationEnd={onAnimationEnd}
                 data-task-id={task.id}
@@ -619,8 +620,11 @@ export default memo(function GanttChart({
 
                 {/* Reorder handle */}
                 <rect x={mx - ds - 14} y={my - ds + 4} width={12} height={2 * ds - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
-                <circle cx={mx - ds - 8} cy={my - 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
-                <circle cx={mx - ds - 8} cy={my + 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
+                <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
+                  <line x1={mx - ds - 12} y1={my - 4} x2={mx - ds - 4} y2={my - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                  <line x1={mx - ds - 12} y1={my}     x2={mx - ds - 4} y2={my}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                  <line x1={mx - ds - 12} y1={my + 4} x2={mx - ds - 4} y2={my + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                </g>
 
                 {/* Move handle (covers diamond) — no resize handles */}
                 <rect x={mx - ds} y={my - ds} width={2 * ds} height={2 * ds} fill="transparent" style={{ cursor: 'grab' }}
@@ -634,6 +638,7 @@ export default memo(function GanttChart({
           return (
             <g
               key={`bar-${task.id}`}
+              className="gantt-task-bar"
               style={animStyle}
               onAnimationEnd={onAnimationEnd}
               onMouseEnter={(e) => { setTooltip({ x: e.clientX, y: e.clientY, task }); }}
@@ -661,8 +666,11 @@ export default memo(function GanttChart({
               )}
 
               <rect x={x - 14} y={y + 4} width={12} height={BAR_HEIGHT - 8} fill="transparent" style={{ cursor: 'ns-resize' }} onMouseDown={(e) => handleRowDragStart(e, i)} />
-              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 - 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
-              <circle cx={x - 8} cy={y + BAR_HEIGHT / 2 + 4} r={1.5} fill="var(--color-text-muted)" opacity={0.5} style={{ pointerEvents: 'none' }} />
+              <g className="task-drag-handle" style={{ pointerEvents: 'none' }}>
+                <line x1={x - 12} y1={y + BAR_HEIGHT / 2 - 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 - 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={x - 12} y1={y + BAR_HEIGHT / 2}     x2={x - 4} y2={y + BAR_HEIGHT / 2}     stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={x - 12} y1={y + BAR_HEIGHT / 2 + 4} x2={x - 4} y2={y + BAR_HEIGHT / 2 + 4} stroke="var(--color-text-muted)" strokeWidth={1.5} strokeLinecap="round" />
+              </g>
 
               <rect x={x + 8} y={y} width={Math.max(barWidth - 16, 4)} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'grab' }}
                 onMouseDown={(e) => handleMouseDown(e, task, 'move')}

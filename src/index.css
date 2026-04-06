@@ -53,6 +53,10 @@ body {
 [data-theme="fantasy"] ::-webkit-scrollbar-thumb { background: #333; }
 [data-theme="fantasy"] ::-webkit-scrollbar-thumb:hover { background: #555; }
 
+/* Drag handle — hidden by default, appears on row hover */
+.task-drag-handle { opacity: 0; transition: opacity 0.15s ease; }
+.gantt-task-bar:hover .task-drag-handle { opacity: 0.35; }
+
 /* Micro-animations */
 
 /* Resize release — stretch and retract like elastic snapping back */
