@@ -653,9 +653,16 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <div className="flex items-center" style={{ gap: 0 }}>
               {others.slice(0, 5).map((user, i) => {
                 const label = user.identity || 'Collaborator';
-                const initials = label.includes('@')
-                  ? label[0].toUpperCase()
-                  : label.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const initials = (() => {
+                  try {
+                    const local = label.includes('@') ? label.split('@')[0] : label;
+                    const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+                    const result = parts.length >= 2
+                      ? (parts[0][0] + parts[1][0]).toUpperCase()
+                      : parts[0]?.[0]?.toUpperCase() || '?';
+                    return result || label[0].toUpperCase();
+                  } catch { return label[0]?.toUpperCase() || '?'; }
+                })();
                 // Cycle through a set of distinct colors per avatar
                 const colors = [
                   { bg: '#4f8ef7', text: '#fff' },
