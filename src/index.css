@@ -106,17 +106,6 @@ body {
   to   { background: rgba(0,0,0,0); }
 }
 
-/* View switch — quick crossfade */
-@keyframes fantt-view-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fantt-fade-in-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* Horizontal resize release — stretch and retract */
 @keyframes fantt-bounce-h {
   0% { transform: scaleX(1); }
@@ -141,16 +130,6 @@ body {
 @keyframes fantt-toast-out {
   from { transform: translateX(0); opacity: 1; }
   to   { transform: translateX(120%); opacity: 0; }
-}
-
-/* Resource grid slide up/down */
-@keyframes fantt-slide-up {
-  from { transform: translateY(100%); opacity: 0.5; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-@keyframes fantt-slide-down {
-  from { transform: translateY(0); opacity: 1; }
-  to   { transform: translateY(100%); opacity: 0; }
 }
 
 /* New task pop-in — scale from small with overshoot */

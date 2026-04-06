@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
+import { memo, useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
 import { getTaskColor, getAllGroups, getContrastColor, PRESET_HEXES } from '../utils/colors';
 
@@ -11,7 +11,7 @@ export function getHeaderHeight(viewMode) {
   return viewMode === 'day' ? 84 : 64;
 }
 
-export default function GanttChart({
+export default memo(function GanttChart({
   tasks,
   viewMode = 'week',
   hideWeekends = false,
@@ -50,6 +50,17 @@ export default function GanttChart({
   const chartWidth = Math.max(totalDays * colWidth, 800);
   const bodyHeight = tasks.length * ROW_HEIGHT + 20;
   const chartHeight = HEADER_HEIGHT + bodyHeight;
+
+  // O(1) dep lookup — replaces per-render findIndex calls in connector loop
+  const taskIndexMap = useMemo(() => new Map(tasks.map((t, i) => [t.id, i])), [tasks]);
+
+  // Stable tooltip handlers — defined once, not recreated per task bar
+  const handleTooltipEnter = useCallback((e) => {
+    const id = e.currentTarget.dataset.taskId;
+    const task = tasks.find(t => t.id === id);
+    if (task) setTooltip({ x: e.clientX, y: e.clientY, task });
+  }, [tasks]);
+  const handleTooltipLeave = useCallback(() => setTooltip(null), []);
 
   const todayStr = useMemo(() => formatDate(new Date()), []);
   const todayX = skipWeekends
@@ -497,8 +508,8 @@ export default function GanttChart({
         {/* Dependency connectors */}
         {tasks.map((task, i) =>
           (task.dependencies || []).map((depId) => {
-            const depIdx = tasks.findIndex((t) => t.id === depId);
-            if (depIdx === -1) return null;
+            const depIdx = taskIndexMap.get(depId);
+            if (depIdx === undefined) return null;
             const dep = tasks[depIdx];
             const fromX = dayToX(dep.end) + colWidth;
             const fromY = depIdx * ROW_HEIGHT + ROW_HEIGHT / 2;
@@ -586,9 +597,10 @@ export default function GanttChart({
                 key={`bar-${task.id}`}
                 style={animStyle}
                 onAnimationEnd={onAnimationEnd}
-                onMouseEnter={(e) => { setTooltip({ x: e.clientX, y: e.clientY, task }); }}
+                data-task-id={task.id}
+                onMouseEnter={handleTooltipEnter}
                 onMouseMove={handleTooltipMove}
-                onMouseLeave={() => setTooltip(null)}
+                onMouseLeave={handleTooltipLeave}
               >
                 {isSelected && (
                   <polygon
@@ -682,4 +694,4 @@ export default function GanttChart({
       )}
     </div>
   );
-}
+});

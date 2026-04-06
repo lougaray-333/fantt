@@ -22,8 +22,22 @@ export function useProjects(email) {
   }, [email]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    let cancelled = false;
+    if (!email) { setLoading(false); return; }
+    setLoading(true);
+    supabase
+      .from('projects')
+      .select('*')
+      .eq('email', email)
+      .order('updated_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) console.error('[useProjects] fetch error:', error);
+        else setProjects(data || []);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [email]);
 
   const canCreateMore = projects.length < MAX_PROJECTS;
 

@@ -1,9 +1,10 @@
+import { memo } from 'react';
 import { Trash2, Diamond } from 'lucide-react';
 import { formatShortDate } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 import { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
 
-export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onDelete }) {
+export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onDelete }) {
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
 
@@ -86,4 +87,4 @@ export default function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect
       </div>
     </div>
   );
-}
+});
