@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2, Pencil } from 'lucide-react';
+import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2, Pencil, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-export default function SharePanel({ projectId, projectName, onClose }) {
+export default function SharePanel({ projectId, projectName, onClose, tasks = [] }) {
   const [tab, setTab] = useState('link');
   const [shareToken, setShareToken] = useState(null);
   const [shareEnabled, setShareEnabled] = useState(false);
@@ -15,6 +15,24 @@ export default function SharePanel({ projectId, projectName, onClose }) {
   const [editCopied, setEditCopied] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
   const [showEditRegenConfirm, setShowEditRegenConfirm] = useState(false);
+  const [scheduleCopied, setScheduleCopied] = useState(false);
+
+  function handleCopySchedule() {
+    if (tasks.length === 0) return;
+    const fmt = (dateStr) => {
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    };
+    const lines = tasks.map((t) => {
+      const s = fmt(t.start);
+      const e = fmt(t.end);
+      return s === e ? `• ${s}: ${t.name}` : `• ${s}–${e}: ${t.name}`;
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setScheduleCopied(true);
+      setTimeout(() => setScheduleCopied(false), 2000);
+    });
+  }
 
   // Fetch current share state for this project
   useEffect(() => {
@@ -346,6 +364,25 @@ export default function SharePanel({ projectId, projectName, onClose }) {
                     Edit link is disabled. Toggle on to re-enable.
                   </p>
                 )}
+
+                {/* Divider */}
+                <div className="border-t border-border" />
+
+                {/* Copy schedule */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-text">Copy schedule</p>
+                    <p className="text-xs text-text-muted mt-0.5">Paste task dates into any doc</p>
+                  </div>
+                  <button
+                    onClick={handleCopySchedule}
+                    disabled={tasks.length === 0}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {scheduleCopied ? <Check size={12} className="text-green-500" /> : <ClipboardList size={12} />}
+                    {scheduleCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
               </>
             )}
           </div>

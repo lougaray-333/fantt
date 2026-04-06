@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Loader2, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, ClipboardList, Share2, History } from 'lucide-react';
+import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Share2, History } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -493,24 +493,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     }, 250);
   };
 
-  const [workbackCopied, setWorkbackCopied] = useState(false);
-  const handleCopyWorkback = useCallback(() => {
-    if (store.tasks.length === 0) return;
-    const fmt = (dateStr) => {
-      const d = new Date(dateStr + 'T00:00:00');
-      return `${d.getMonth() + 1}/${d.getDate()}`;
-    };
-    const lines = store.tasks.map((t) => {
-      const s = fmt(t.start);
-      const e = fmt(t.end);
-      return s === e ? `• ${s}: ${t.name}` : `• ${s}-${e}: ${t.name}`;
-    });
-    navigator.clipboard.writeText(lines.join('\n')).then(() => {
-      setWorkbackCopied(true);
-      setTimeout(() => setWorkbackCopied(false), 2000);
-    });
-  }, [store.tasks]);
-
   if (store.loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
@@ -570,7 +552,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         )}
 
         <div className="flex items-center gap-2">
-          {/* Undo / Redo */}
+          {/* Group 1: Edit */}
           <button
             onClick={() => { const s = history.undo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
             disabled={!history.canUndo}
@@ -587,8 +569,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           >
             <Redo2 size={15} />
           </button>
-
-          {/* Delete selected */}
           {selectedIds.size > 1 && (
             <button
               onClick={handleDeleteSelected}
@@ -599,7 +579,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             </button>
           )}
 
-          {/* Add Task */}
+          <div className="h-4 w-px bg-border/60" />
+
+          {/* Group 2: Create */}
           <button
             onClick={handleOpenAdd}
             className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
@@ -607,8 +589,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <Plus size={14} />
             Add Task
           </button>
-
-          {/* Library */}
           <button
             onClick={() => setLibraryOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition"
@@ -617,7 +597,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             Library
           </button>
 
-          {/* Share */}
+          <div className="h-4 w-px bg-border/60" />
+
+          {/* Group 3: Share & collaborate */}
           <button
             onClick={() => setSharePanelOpen(true)}
             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
@@ -626,20 +608,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <Share2 size={13} />
             Share
           </button>
-
-          {/* Workback export */}
-          {store.tasks.length > 0 && (
-            <button
-              onClick={handleCopyWorkback}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
-              title="Copy workback schedule to clipboard"
-            >
-              {workbackCopied ? <Check size={13} className="text-green-500" /> : <ClipboardList size={13} />}
-              {workbackCopied ? 'Copied!' : 'Workback'}
-            </button>
-          )}
-
-          {/* History panel toggle */}
           <button
             onClick={() => setHistoryOpen(o => !o)}
             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${historyOpen ? 'bg-bg-alt text-text' : 'text-text-muted hover:bg-bg-alt'}`}
@@ -648,7 +616,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <History size={13} />
           </button>
 
-          {/* Presence avatars */}
+          {/* Collaborator avatars */}
           {others.length > 0 && (
             <div className="flex items-center" style={{ gap: 0 }}>
               {others.slice(0, 5).map((user, i) => {
@@ -663,7 +631,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                     return result || label[0].toUpperCase();
                   } catch { return label[0]?.toUpperCase() || '?'; }
                 })();
-                // Cycle through a set of distinct colors per avatar
                 const colors = [
                   { bg: '#4f8ef7', text: '#fff' },
                   { bg: '#f7874f', text: '#fff' },
@@ -681,15 +648,13 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                       borderRadius: '50%',
                       background: c.bg,
                       color: c.text,
-                      fontSize: 10,
-                      fontWeight: 700,
+                      fontSize: 10, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       border: '2px solid var(--color-bg)',
                       marginLeft: i === 0 ? 0 : -6,
                       zIndex: others.length - i,
                       position: 'relative',
-                      cursor: 'default',
-                      flexShrink: 0,
+                      cursor: 'default', flexShrink: 0,
                     }}
                   >
                     {initials}
@@ -707,8 +672,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                     fontSize: 9, fontWeight: 700,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     border: '2px solid var(--color-bg)',
-                    marginLeft: -6, position: 'relative', zIndex: 0,
-                    flexShrink: 0,
+                    marginLeft: -6, position: 'relative', zIndex: 0, flexShrink: 0,
                   }}
                 >
                   +{others.length - 5}
@@ -717,25 +681,46 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             </div>
           )}
 
-          {/* Save status */}
-          <span className="text-[11px] text-text-muted/60">
-            {store.saveStatus === 'saving' ? (
-              <span className="flex items-center gap-1">
-                <Loader2 size={10} className="animate-spin" />
-                Saving…
-              </span>
-            ) : store.lastSavedAt ? (
-              <span className="flex items-center gap-1">
-                <Check size={10} />
-                Saved {store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            ) : null}
-          </span>
+          {/* You avatar — shows your initials; tooltip has email + save status */}
+          {email && (() => {
+            try {
+              const local = email.includes('@') ? email.split('@')[0] : email;
+              const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+              const initials = parts.length >= 2
+                ? (parts[0][0] + parts[1][0]).toUpperCase()
+                : parts[0]?.[0]?.toUpperCase() || '?';
+              const savedLabel = store.saveStatus === 'saving'
+                ? 'Saving…'
+                : store.lastSavedAt
+                  ? `Saved ${store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : null;
+              const tooltip = [email, savedLabel].filter(Boolean).join(' · ');
+              return (
+                <div
+                  title={tooltip}
+                  className={store.saveStatus === 'saving' ? 'animate-pulse' : ''}
+                  style={{
+                    width: 26, height: 26,
+                    borderRadius: '50%',
+                    background: 'var(--color-accent)',
+                    color: '#fff',
+                    fontSize: 10, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '2px solid var(--color-bg)',
+                    outline: store.saveStatus === 'saving' ? '2px solid var(--color-accent)' : 'none',
+                    outlineOffset: '2px',
+                    cursor: 'default', flexShrink: 0,
+                  }}
+                >
+                  {initials}
+                </div>
+              );
+            } catch { return null; }
+          })()}
 
-          {/* Email */}
-          <span className="text-[11px] text-text-muted">{email}</span>
+          <div className="h-4 w-px bg-border/60" />
 
-          {/* Theme toggle */}
+          {/* Group 4: Settings */}
           <button
             onClick={toggleTheme}
             className="rounded-lg border border-border p-1.5 text-text-muted hover:bg-bg-alt transition"
@@ -919,6 +904,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <SharePanel
               projectId={projectId}
               projectName={projectName}
+              tasks={store.tasks}
               onClose={() => setSharePanelOpen(false)}
             />
           </div>
