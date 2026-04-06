@@ -374,6 +374,11 @@ export default memo(function GanttChart({
           <rect x={0} y={0} width={chartWidth} height={HEADER_HEIGHT} fill="var(--color-bg-alt)" />
           <line x1={0} y1={HEADER_HEIGHT - 0.5} x2={chartWidth} y2={HEADER_HEIGHT - 0.5} stroke="var(--color-border)" />
 
+          {/* Today column highlight in header */}
+          {showToday && (
+            <rect x={todayX} y={0} width={colWidth} height={HEADER_HEIGHT} fill="var(--color-accent)" fillOpacity={0.1} style={{ pointerEvents: 'none' }} />
+          )}
+
           {/* User-clicked column highlight in header */}
           {highlightedDate && viewMode === 'day' && (() => {
             const hx = dayToX(highlightedDate);
