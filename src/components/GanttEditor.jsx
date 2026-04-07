@@ -3,8 +3,8 @@ import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, 
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
-import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
-import GanttChart from './GanttChart';
+import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays, diffDays, getDateRange } from '../utils/dates';
+import GanttChart, { COL_WIDTHS } from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
 import ViewModeToggle from './ViewModeToggle';
@@ -254,6 +254,26 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   // Scroll sync refs — gantt drives, resource follows
   const ganttScrollRef = useRef(null);
   const resourceScrollRef = useRef(null);
+  const initialScrollDoneRef = useRef(false);
+
+  // On first load, scroll so the earliest task is near the left edge
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return;
+    if (store.loading || store.tasks.length === 0) return;
+    const el = ganttScrollRef.current;
+    if (!el) return;
+
+    const tasks = store.tasks;
+    let minStart = tasks[0].start;
+    for (const t of tasks) if (t.start < minStart) minStart = t.start;
+
+    const { start: rangeStart } = getDateRange(tasks);
+    const colWidth = COL_WIDTHS[viewMode];
+    const days = diffDays(rangeStart, new Date(minStart + 'T00:00:00'));
+    // Leave ~2 columns of breathing room to the left
+    el.scrollLeft = Math.max(0, days * colWidth - colWidth * 2);
+    initialScrollDoneRef.current = true;
+  }, [store.loading, store.tasks, viewMode]);
 
   const handleGanttScroll = useCallback((scrollLeft) => {
     const el = resourceScrollRef.current;
