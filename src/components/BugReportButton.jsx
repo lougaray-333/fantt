@@ -41,24 +41,30 @@ export default function BugReportButton() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canSubmit || !isConfigured) return;
+    if (!canSubmit) return;
 
     setSubmitting(true);
-    const { error } = await supabase.from('bug_reports').insert({
-      reporter_name: form.reporter_name.trim(),
-      replication_steps: form.replication_steps.trim(),
-      actual_result: form.actual_result.trim(),
-      expected_result: form.expected_result.trim(),
-    });
-    setSubmitting(false);
 
-    if (!error) {
-      setForm({ reporter_name: '', replication_steps: '', actual_result: '', expected_result: '' });
-      setOpen(false);
-      setToast('in');
-      setTimeout(() => setToast('out'), 2000);
-      setTimeout(() => setToast(null), 2400);
+    if (isConfigured) {
+      const { error } = await supabase.from('bug_reports').insert({
+        reporter_name: form.reporter_name.trim(),
+        replication_steps: form.replication_steps.trim(),
+        actual_result: form.actual_result.trim(),
+        expected_result: form.expected_result.trim(),
+        status: 'open',
+        created_at: new Date().toISOString(),
+      });
+      if (error) {
+        console.error('Bug report insert failed:', error);
+      }
     }
+
+    setSubmitting(false);
+    setForm({ reporter_name: '', replication_steps: '', actual_result: '', expected_result: '' });
+    setOpen(false);
+    setToast('in');
+    setTimeout(() => setToast('out'), 2500);
+    setTimeout(() => setToast(null), 2900);
   };
 
   return (
@@ -160,7 +166,7 @@ export default function BugReportButton() {
       {/* Success toast */}
       {toast && (
         <div
-          className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
+          className="fixed bottom-5 right-20 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
           style={{
             animation: toast === 'in'
               ? 'fantt-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
