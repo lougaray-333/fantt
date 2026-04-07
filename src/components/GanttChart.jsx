@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays, snapToMonday } from '../utils/dates';
 import { getTaskColor, getAllGroups, getContrastColor, PRESET_HEXES } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
@@ -231,12 +231,14 @@ export default memo(function GanttChart({
         if (type === 'move') {
           onDragMove(task.id, daysDelta);
         } else if (type === 'resize-end') {
-          const newEnd = addDays(new Date(origEnd + 'T00:00:00'), daysDelta);
+          const rawEnd = addDays(new Date(origEnd + 'T00:00:00'), daysDelta);
+          const newEnd = snapToMonday(rawEnd);
           if (newEnd >= new Date(origStart + 'T00:00:00')) {
             onTaskUpdate(task.id, { end: formatDate(newEnd) });
           }
         } else if (type === 'resize-start') {
-          const newStart = addDays(new Date(origStart + 'T00:00:00'), daysDelta);
+          const rawStart = addDays(new Date(origStart + 'T00:00:00'), daysDelta);
+          const newStart = snapToMonday(rawStart);
           if (newStart <= new Date(origEnd + 'T00:00:00')) {
             onTaskUpdate(task.id, { start: formatDate(newStart) });
           }
