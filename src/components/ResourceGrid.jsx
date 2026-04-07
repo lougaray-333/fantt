@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X, Eraser } from 'lucide-react';
 import { RATE_CARD, getDepartments } from '../data/rateCard';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, getMonday } from '../utils/dates';
 import { COL_WIDTHS } from './GanttChart';
 
 const ROLE_COL_WIDTH = 280;
@@ -78,6 +78,28 @@ export default memo(function ResourceGrid({
     }
     return arr;
   }, [rangeStart, totalDays, skipWeekends]);
+
+  // Week spans — groups of consecutive dates within the same Mon–Sun week
+  const weekSpans = useMemo(() => {
+    if (dates.length === 0 || tasks.length === 0) return [];
+    let earliest = tasks[0].start;
+    for (const t of tasks) if (t.start < earliest) earliest = t.start;
+    const week1Monday = getMonday(earliest);
+    const spans = [];
+    let i = 0;
+    while (i < dates.length) {
+      const monday = getMonday(dates[i].str);
+      let j = i;
+      while (j < dates.length && getMonday(dates[j].str).getTime() === monday.getTime()) j++;
+      const count = j - i;
+      const weekNum = Math.round(diffDays(week1Monday, monday) / 7) + 1;
+      if (weekNum >= 1) {
+        spans.push({ startIdx: i, count, width: count * colWidth, label: `W${weekNum}`, first: i === 0 });
+      }
+      i = j;
+    }
+    return spans;
+  }, [dates, colWidth, tasks]);
 
   // Dates covered by at least one task
   const coveredDates = useMemo(() => {
@@ -392,8 +414,28 @@ export default memo(function ResourceGrid({
             className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-sidebar"
           >
             <div style={{ width: totalWidth, minWidth: '100%' }}>
-              {/* Header row — sticky top */}
-              <div className="flex sticky top-0 z-20 border-b border-border bg-sidebar" style={{ height: ROW_H }}>
+              {/* Week row — sticky top */}
+              <div className="flex sticky top-0 z-20 border-b border-border/50 bg-sidebar" style={{ height: ROW_H }}>
+                <div
+                  className="sticky left-0 z-30 shrink-0 border-r border-border bg-sidebar"
+                  style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
+                />
+                {weekSpans.map((w) => (
+                  <div
+                    key={w.label + w.startIdx}
+                    className="shrink-0 flex items-center justify-center relative"
+                    style={{ width: w.width, height: ROW_H }}
+                  >
+                    <span className="text-[9px] font-semibold text-text-muted/60 uppercase tracking-wider">{w.label}</span>
+                    {!w.first && showGrid && (
+                      <div className="absolute left-0 top-1 bottom-1 w-px bg-[var(--color-grid)]" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day header row — sticky top (below week row) */}
+              <div className="flex sticky top-[28px] z-20 border-b border-border bg-sidebar" style={{ height: ROW_H }}>
                 <div
                   className="sticky left-0 z-30 shrink-0 flex items-center px-3 border-r border-border bg-sidebar"
                   style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
