@@ -913,6 +913,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           <ResourceGrid
               tasks={store.tasks}
               viewMode={viewMode}
+              showGrid={showGrid}
               hideWeekends={hideWeekends}
               showGrid={showGrid}
               ganttScrollRef={ganttScrollRef}

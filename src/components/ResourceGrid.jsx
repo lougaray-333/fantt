@@ -47,9 +47,12 @@ export default memo(function ResourceGrid({
   ganttScrollRef,
   highlightedDate,
   onDateClick,
+  showGrid = true,
 }) {
   const departments = useMemo(() => getDepartments(), []);
   const hiddenSet = useMemo(() => new Set(hiddenRoles || []), [hiddenRoles]);
+  const colBorder = showGrid ? 'border-r border-border/60' : 'border-r border-transparent';
+  const rowBorder = showGrid ? 'border-b border-border/40' : 'border-b border-transparent';
   const colWidth = COL_WIDTHS[viewMode];
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const addRoleRef = useRef(null);
@@ -396,7 +399,7 @@ export default memo(function ResourceGrid({
                   <div
                     key={d.str}
                     onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
-                    className={`shrink-0 flex flex-col items-center justify-center text-center border-r border-border/30 cursor-pointer
+                    className={`shrink-0 flex flex-col items-center justify-center text-center ${colBorder} cursor-pointer
                       hover:bg-accent/15 transition-colors select-none
                       ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: colWidth, height: ROW_H }}
@@ -423,7 +426,7 @@ export default memo(function ResourceGrid({
                       {dates.map((d) => (
                         <div
                           key={d.str}
-                          className={`shrink-0 border-r border-border/20 bg-bg-alt/60
+                          className={`shrink-0 ${colBorder} bg-bg-alt/60
                             ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                           style={{ width: colWidth, height: ROW_H }}
                         />
@@ -436,7 +439,7 @@ export default memo(function ResourceGrid({
                       const activeLevel = getActiveLevel(entry.role);
                       const personName = (roleNames || {})[entry.role] || '';
                       return (
-                        <div key={entry.role} className="flex border-b border-border/30" style={{ height: ROW_H }}>
+                        <div key={entry.role} className={`flex ${rowBorder}`} style={{ height: ROW_H }}>
                           <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role">
                             <div className="flex items-center px-2 h-full gap-1">
                               <button
@@ -497,7 +500,7 @@ export default memo(function ResourceGrid({
                             return (
                               <div
                                 key={d.str}
-                                className={`shrink-0 border-r border-border/20 flex items-center justify-center
+                                className={`shrink-0 ${colBorder} flex items-center justify-center
                                   ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                                 style={{ width: colWidth, height: ROW_H }}
                                 title={orphaned ? 'No activity on this date' : undefined}
