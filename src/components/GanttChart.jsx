@@ -403,7 +403,8 @@ export default memo(function GanttChart({
               <text x={m.x + m.width / 2} y={18} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--color-text)" style={{ fontFamily: 'var(--font-sans)' }}>
                 {m.label}
               </text>
-              {i > 0 && <line x1={m.x} y1={4} x2={m.x} y2={26} stroke="var(--color-border)" strokeWidth={0.5} />}
+              {/* Month boundary line — only at month edges, only in the month band */}
+              {i > 0 && showGrid && <line x1={m.x} y1={0} x2={m.x} y2={28} stroke="var(--color-grid)" strokeWidth={1} />}
             </g>
           ))}
 
@@ -416,6 +417,8 @@ export default memo(function GanttChart({
               <text x={w.x + w.width / 2} y={42} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--color-text-muted)" style={{ fontFamily: 'var(--font-sans)' }}>
                 {w.label}
               </text>
+              {/* Week boundary line — only at week edges, only in the week band */}
+              {i > 0 && showGrid && <line x1={w.x} y1={28} x2={w.x} y2={48} stroke="var(--color-grid)" strokeWidth={1} />}
             </g>
           ))}
 
@@ -451,8 +454,8 @@ export default memo(function GanttChart({
                   )}
                 </>
               )}
-              {/* Vertical grid line in header */}
-              {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={HEADER_HEIGHT} stroke="var(--color-grid)" strokeWidth={1} />}
+              {/* Vertical grid line — only in the day row band */}
+              {showGrid && <line x1={h.x} y1={viewMode === 'day' ? 48 : 0} x2={h.x} y2={HEADER_HEIGHT} stroke="var(--color-grid)" strokeWidth={1} />}
             </g>
           ))}
         </svg>
