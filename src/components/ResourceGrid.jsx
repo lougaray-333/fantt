@@ -36,6 +36,8 @@ export default memo(function ResourceGrid({
   onShowRole,
   roleNames,
   onRoleNameChange,
+  roleRates,
+  onRoleRateChange,
   oopExpenses,
   onOopChange,
   onAddOop,
@@ -99,11 +101,12 @@ export default memo(function ResourceGrid({
     const costPerDay = {};
     for (const entry of RATE_CARD) {
       if (hiddenSet.has(entry.role)) continue;
+      const effectiveRate = (roleRates || {})[entry.role] ?? entry.rate;
       const roleData = resourceHours[entry.role] || {};
       for (const [dateStr, hours] of Object.entries(roleData)) {
         if (hours > 0) {
           hoursPerDay[dateStr] = (hoursPerDay[dateStr] || 0) + hours;
-          const dayCost = hours * entry.rate;
+          const dayCost = hours * effectiveRate;
           costPerDay[dateStr] = (costPerDay[dateStr] || 0) + dayCost;
           grandTotal += dayCost;
           grandHours += hours;
@@ -114,7 +117,7 @@ export default memo(function ResourceGrid({
       if ((oop.amount || 0) > 0) grandTotal += oop.amount;
     }
     return { hoursPerDay, costPerDay, grandTotal, grandHours };
-  }, [resourceHours, oopExpenses, hiddenSet]);
+  }, [resourceHours, oopExpenses, hiddenSet, roleRates]);
 
   const formatCurrency = (n) =>
     n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
@@ -124,15 +127,16 @@ export default memo(function ResourceGrid({
     const map = {};
     for (const entry of RATE_CARD) {
       if (hiddenSet.has(entry.role)) continue;
+      const effectiveRate = (roleRates || {})[entry.role] ?? entry.rate;
       const roleData = resourceHours[entry.role] || {};
       let deptCost = 0;
       for (const hours of Object.values(roleData)) {
-        if (hours > 0) deptCost += hours * entry.rate;
+        if (hours > 0) deptCost += hours * effectiveRate;
       }
       if (deptCost > 0) map[entry.department] = (map[entry.department] || 0) + deptCost;
     }
     return map;
-  }, [resourceHours, hiddenSet]);
+  }, [resourceHours, hiddenSet, roleRates]);
 
   // Cost by phase
   const costByPhase = useMemo(() => {
@@ -151,16 +155,17 @@ export default memo(function ResourceGrid({
     const map = {};
     for (const entry of RATE_CARD) {
       if (hiddenSet.has(entry.role)) continue;
+      const effectiveRate = (roleRates || {})[entry.role] ?? entry.rate;
       const roleData = resourceHours[entry.role] || {};
       for (const [dateStr, hours] of Object.entries(roleData)) {
         if (hours > 0 && datePhaseMap[dateStr]) {
           const phase = datePhaseMap[dateStr];
-          map[phase] = (map[phase] || 0) + hours * entry.rate;
+          map[phase] = (map[phase] || 0) + hours * effectiveRate;
         }
       }
     }
     return map;
-  }, [resourceHours, oopExpenses, tasks, hiddenSet]);
+  }, [resourceHours, oopExpenses, tasks, hiddenSet, roleRates]);
 
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const breakdownRef = useRef(null);
@@ -449,15 +454,16 @@ export default memo(function ResourceGrid({
                               >
                                 <X size={11} />
                               </button>
+                              {/* Default view: role name + person name */}
                               <div className="flex-1 min-w-0 flex items-center gap-1 group-hover/role:hidden">
                                 <span className="text-[11px] text-text truncate">{entry.role}</span>
                                 {personName && (
                                   <span className="text-[10px] text-accent truncate shrink-0 max-w-[70px]">· {personName}</span>
                                 )}
-                                <span className="text-[10px] text-text-muted font-mono ml-auto shrink-0">${entry.rate}</span>
                               </div>
+                              {/* Hover view: name input + quick-fill buttons */}
                               <div className="flex-1 min-w-0 items-center gap-1 hidden group-hover/role:flex">
-                                <span className="text-[10px] text-text truncate shrink-0 max-w-[80px]">{entry.role}</span>
+                                <span className="text-[10px] text-text truncate shrink-0 max-w-[60px]">{entry.role}</span>
                                 <LocalInput
                                   type="text"
                                   value={personName}
@@ -491,6 +497,20 @@ export default memo(function ResourceGrid({
                                     </button>
                                   )}
                                 </div>
+                              </div>
+                              {/* Rate — always visible, editable on click */}
+                              <div className="shrink-0 flex items-center gap-px" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-[10px] text-text-muted/50">$</span>
+                                <LocalInput
+                                  type="number"
+                                  min="0"
+                                  value={(roleRates || {})[entry.role] ?? entry.rate}
+                                  onChange={(val) => onRoleRateChange(entry.role, val)}
+                                  className="w-[36px] text-[10px] font-mono text-text-muted bg-transparent border-none outline-none text-right
+                                    focus:text-text focus:bg-accent/10 focus:rounded px-0.5
+                                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  title="Edit rate ($/hr)"
+                                />
                               </div>
                             </div>
                           </RoleCell>

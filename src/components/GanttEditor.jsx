@@ -81,6 +81,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const [roleNames, setRoleNames] = useState(() => {
     try { return JSON.parse(localStorage.getItem(budgetKey + '-names')) || {}; } catch { return {}; }
   });
+  const [roleRates, setRoleRates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(budgetKey + '-rates')) || {}; } catch { return {}; }
+  });
   const [budgetCollapsed, setBudgetCollapsed] = useState(true);
   const [splitPct, setSplitPct] = useState(50);
   const splitContainerRef = useRef(null);
@@ -114,10 +117,10 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   }, [showGrid]);
 
   // Undo/Redo
-  const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {} });
+  const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {}, roleRates: {} });
   useEffect(() => {
-    stateRef.current = { tasks: store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames };
-  }, [store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames]);
+    stateRef.current = { tasks: store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames, roleRates };
+  }, [store.tasks, resourceHours, oopExpenses, hiddenRoles, roleNames, roleRates]);
 
   const getCurrentSnapshot = () => ({ ...stateRef.current });
 
@@ -127,6 +130,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     setOopExpenses(snapshot.oopExpenses);
     setHiddenRoles(snapshot.hiddenRoles);
     setRoleNames(snapshot.roleNames);
+    setRoleRates(snapshot.roleRates || {});
   }, [store]);
 
   const snap = () => history.pushSnapshot(getCurrentSnapshot());
@@ -156,7 +160,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     budgetLoadedRef.current = true;
     supabase
       .from('project_budgets')
-      .select('resource_hours, oop_expenses, hidden_roles, role_names')
+      .select('resource_hours, oop_expenses, hidden_roles, role_names, role_rates')
       .eq('project_id', projectId)
       .single()
       .then(({ data }) => {
@@ -165,6 +169,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           if (data.oop_expenses) setOopExpenses(data.oop_expenses);
           if (data.hidden_roles) setHiddenRoles(data.hidden_roles);
           if (data.role_names) setRoleNames(data.role_names);
+          if (data.role_rates) setRoleRates(data.role_rates);
         }
       });
   }, [projectId]);
@@ -179,6 +184,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
       localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
       localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
+      localStorage.setItem(budgetKey + '-rates', JSON.stringify(roleRates));
       // Sync to Supabase
       if (isConfigured && projectId) {
         lastLocalBudgetSaveRef.current = Date.now();
@@ -188,11 +194,12 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           oop_expenses: oopExpenses,
           hidden_roles: hiddenRoles,
           role_names: roleNames,
+          role_rates: roleRates,
           updated_at: new Date().toISOString(),
         }).then(() => {});
       }
     }, 500);
-  }, [resourceHours, oopExpenses, hiddenRoles, roleNames, budgetKey, projectId]);
+  }, [resourceHours, oopExpenses, hiddenRoles, roleNames, roleRates, budgetKey, projectId]);
 
   // Realtime subscription for budget changes from other collaborators
   useEffect(() => {
@@ -211,6 +218,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         if (row.oop_expenses) setOopExpenses(row.oop_expenses);
         if (row.hidden_roles) setHiddenRoles(row.hidden_roles);
         if (row.role_names) setRoleNames(row.role_names);
+        if (row.role_rates) setRoleRates(row.role_rates);
       })
       .subscribe();
     return () => supabase.removeChannel(ch);
@@ -228,6 +236,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         oop_expenses: stateRef.current.oopExpenses,
         hidden_roles: stateRef.current.hiddenRoles,
         role_names: stateRef.current.roleNames,
+        role_rates: stateRef.current.roleRates,
         updated_at: new Date().toISOString(),
       }).then(() => {
         setAutoSaveToast('in');
@@ -281,6 +290,11 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const handleRoleNameChange = useCallback((role, name) => {
     snap();
     setRoleNames((prev) => ({ ...prev, [role]: name }));
+  }, []);
+
+  const handleRoleRateChange = useCallback((role, rate) => {
+    snap();
+    setRoleRates((prev) => ({ ...prev, [role]: Number(rate) || 0 }));
   }, []);
 
   const handleResourceHoursChange = useCallback((role, dateStr, hours) => {
@@ -925,6 +939,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               onShowRole={handleShowRole}
               roleNames={roleNames}
               onRoleNameChange={handleRoleNameChange}
+              roleRates={roleRates}
+              onRoleRateChange={handleRoleRateChange}
               oopExpenses={oopExpenses}
               onOopChange={handleOopChange}
               onAddOop={handleAddOop}
