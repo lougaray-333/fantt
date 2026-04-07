@@ -79,7 +79,9 @@ export default memo(function ResourceGrid({
     return arr;
   }, [rangeStart, totalDays, skipWeekends]);
 
-  // Week spans — groups of consecutive dates within the same Mon–Sun week
+  // Week spans — groups of consecutive dates within the same Mon–Sun week.
+  // Includes ALL weeks (even pre-project ones) so flex positioning matches the date columns.
+  // Only labels weeks >= W1 (same filter as GanttChart).
   const weekSpans = useMemo(() => {
     if (dates.length === 0 || tasks.length === 0) return [];
     let earliest = tasks[0].start;
@@ -93,9 +95,7 @@ export default memo(function ResourceGrid({
       while (j < dates.length && getMonday(dates[j].str).getTime() === monday.getTime()) j++;
       const count = j - i;
       const weekNum = Math.round(diffDays(week1Monday, monday) / 7) + 1;
-      if (weekNum >= 1) {
-        spans.push({ startIdx: i, count, width: count * colWidth, label: `W${weekNum}`, first: i === 0 });
-      }
+      spans.push({ startIdx: i, count, width: count * colWidth, label: weekNum >= 1 ? `W${weekNum}` : '', first: i === 0 });
       i = j;
     }
     return spans;
