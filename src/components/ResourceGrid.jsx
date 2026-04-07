@@ -51,8 +51,8 @@ export default memo(function ResourceGrid({
 }) {
   const departments = useMemo(() => getDepartments(), []);
   const hiddenSet = useMemo(() => new Set(hiddenRoles || []), [hiddenRoles]);
-  const colBorder = showGrid ? 'border-r border-border/60' : 'border-r border-transparent';
-  const rowBorder = showGrid ? 'border-b border-border/40' : 'border-b border-transparent';
+  const colBorder = showGrid ? 'border-r border-[var(--color-grid)]' : 'border-r border-transparent';
+  const rowBorder = showGrid ? 'border-b border-[var(--color-grid)]' : 'border-b border-transparent';
   const colWidth = COL_WIDTHS[viewMode];
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const addRoleRef = useRef(null);
@@ -404,8 +404,8 @@ export default memo(function ResourceGrid({
                       ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: colWidth, height: ROW_H }}
                   >
-                    <span className={`text-[9px] leading-none ${isColActive(d) ? 'text-accent font-bold' : 'text-text-muted'}`}>{d.day}</span>
-                    <span className={`text-[8px] leading-none ${isColActive(d) ? 'text-accent' : 'text-text-muted/60'}`}>{d.abbr}</span>
+                    <span className={`text-[9px] leading-none ${isColActive(d) ? 'text-accent font-bold' : 'text-text'}`}>{d.day}</span>
+                    <span className={`text-[8px] leading-none ${isColActive(d) ? 'text-accent' : 'text-text-muted'}`}>{d.abbr}</span>
                   </div>
                 ))}
               </div>
