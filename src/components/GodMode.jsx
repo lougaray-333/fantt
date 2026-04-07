@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase, isConfigured } from '../lib/supabase';
+import { fetchActivities } from '../data/activityDatabase';
 import { Lock, ArrowLeft, Users, FolderOpen, ListTodo, TrendingUp, Search, Plus, Pencil, Trash2, X, Bug, Save, Loader2 } from 'lucide-react';
 
 const GODMODE_SECRET = import.meta.env.VITE_GODMODE_SECRET;
@@ -332,8 +333,8 @@ function ActivitiesTab() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('activities').select('*').order('id');
-    if (data) setActivities(data);
+    const data = await fetchActivities();
+    setActivities(data);
     setLoading(false);
   };
 
@@ -359,7 +360,20 @@ function ActivitiesTab() {
   };
 
   const handleEdit = (activity) => {
-    setEditing({ ...activity });
+    // Normalize camelCase (local DB) or snake_case (Supabase) to snake_case for the form
+    setEditing({
+      id: activity.id,
+      in_by_default: activity.in_by_default ?? activity.inByDefault ?? false,
+      name: activity.name || '',
+      phase: activity.phase || 'Insight',
+      duration: activity.duration || '',
+      duration_days_min: activity.duration_days_min ?? activity.durationDays?.[0] ?? 0,
+      duration_days_max: activity.duration_days_max ?? activity.durationDays?.[1] ?? 0,
+      owner: activity.owner || '',
+      contributors: activity.contributors || '',
+      scoping: activity.scoping || '',
+      description: activity.description || '',
+    });
     setIsNew(false);
   };
 
@@ -607,7 +621,7 @@ function ActivitiesTab() {
                   <td className="px-3 py-2 text-text-muted">{a.owner || '—'}</td>
                   <td className="px-3 py-2 text-text-muted">{a.duration || '—'}</td>
                   <td className="px-3 py-2">
-                    {a.in_by_default && <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">DEFAULT</span>}
+                    {(a.in_by_default || a.inByDefault) && <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">DEFAULT</span>}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
