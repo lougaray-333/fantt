@@ -33,6 +33,7 @@ export default memo(function GanttChart({
   onHorizontalScroll,
   highlightedDate,
   onDateClick,
+  showGrid = true,
 }) {
   const svgRef = useRef(null);
   const internalScrollRef = useRef(null);
@@ -449,7 +450,7 @@ export default memo(function GanttChart({
                 </>
               )}
               {/* Vertical grid line in header */}
-              <line x1={h.x} y1={0} x2={h.x} y2={HEADER_HEIGHT} stroke="var(--color-grid)" strokeWidth={0.5} />
+              {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={HEADER_HEIGHT} stroke="var(--color-grid)" strokeWidth={1} />}
             </g>
           ))}
         </svg>
@@ -493,7 +494,7 @@ export default memo(function GanttChart({
             {h.isWeekend && (
               <rect x={h.x} y={0} width={h.width} height={bodyHeight} fill="var(--color-weekend)" />
             )}
-            <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={0.5} />
+            {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={1} />}
           </g>
         ))}
 
@@ -507,7 +508,7 @@ export default memo(function GanttChart({
               fill={isRowSelected ? 'var(--color-accent-light)' : i % 2 === 1 ? 'var(--color-bg-alt)' : 'transparent'}
               opacity={isRowSelected ? 0.4 : 0.3}
             />
-            <line x1={0} y1={(i + 1) * ROW_HEIGHT} x2={chartWidth} y2={(i + 1) * ROW_HEIGHT} stroke="var(--color-grid)" strokeWidth={0.5} />
+            {showGrid && <line x1={0} y1={(i + 1) * ROW_HEIGHT} x2={chartWidth} y2={(i + 1) * ROW_HEIGHT} stroke="var(--color-grid)" strokeWidth={1} />}
           </g>
           );
         })}

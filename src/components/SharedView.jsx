@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Diamond } from 'lucide-react';
+import { Diamond, CalendarOff, Grid3x3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import GanttChart, { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
 import FanttLogo from './FanttLogo';
@@ -72,6 +72,8 @@ export default function SharedView({ token }) {
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | invalid
+  const [hideWeekends, setHideWeekends] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -140,7 +142,25 @@ export default function SharedView({ token }) {
         {project?.name && (
           <span className="text-sm font-medium text-text-muted truncate max-w-[40%] text-center">{project.name}</span>
         )}
-        <span className="text-xs text-text-muted/50 hidden sm:block">View only</span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setHideWeekends(h => !h)}
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition ${hideWeekends ? 'bg-accent/15 text-accent' : 'text-text-muted hover:bg-bg-alt'}`}
+            title={hideWeekends ? 'Show weekends' : 'Hide weekends'}
+          >
+            <CalendarOff size={13} />
+            <span className="hidden sm:inline">Weekends</span>
+          </button>
+          <button
+            onClick={() => setShowGrid(g => !g)}
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition ${showGrid ? 'bg-accent/15 text-accent' : 'text-text-muted hover:bg-bg-alt'}`}
+            title={showGrid ? 'Hide grid' : 'Show grid'}
+          >
+            <Grid3x3 size={13} />
+            <span className="hidden sm:inline">Grid</span>
+          </button>
+          <span className="text-xs text-text-muted/50 ml-1 hidden sm:block">View only</span>
+        </div>
       </div>
 
       {/* Main: task list + gantt in shared scroll container */}
@@ -155,7 +175,8 @@ export default function SharedView({ token }) {
             <GanttChart
               tasks={tasks}
               viewMode={VIEW_MODE}
-              hideWeekends={false}
+              hideWeekends={hideWeekends}
+              showGrid={showGrid}
               ganttScrollRef={scrollRef}
               selectedIds={new Set()}
               onTaskClick={() => {}}

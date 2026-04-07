@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Share2, History } from 'lucide-react';
+import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Grid3x3, Share2, History } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -102,10 +102,16 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const [hideWeekends, setHideWeekends] = useState(() => {
     try { return JSON.parse(localStorage.getItem('gantt-v2-hide-weekends')) || false; } catch { return false; }
   });
-  // Persist hideWeekends to localStorage
+  const [showGrid, setShowGrid] = useState(() => {
+    try { const v = localStorage.getItem('gantt-v2-show-grid'); return v === null ? true : JSON.parse(v); } catch { return true; }
+  });
+  // Persist preferences to localStorage
   useEffect(() => {
     localStorage.setItem('gantt-v2-hide-weekends', JSON.stringify(hideWeekends));
   }, [hideWeekends]);
+  useEffect(() => {
+    localStorage.setItem('gantt-v2-show-grid', JSON.stringify(showGrid));
+  }, [showGrid]);
 
   // Undo/Redo
   const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {} });
@@ -542,6 +548,20 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             <CalendarOff size={13} />
             Weekends
           </button>
+
+          {/* Grid toggle */}
+          <button
+            onClick={() => setShowGrid((g) => !g)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              showGrid
+                ? 'bg-accent/15 text-accent'
+                : 'text-text-muted hover:bg-bg-alt'
+            }`}
+            title={showGrid ? 'Hide grid' : 'Show grid'}
+          >
+            <Grid3x3 size={13} />
+            Grid
+          </button>
         </div>
 
         {/* Project name — centered */}
@@ -822,6 +842,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               tasks={store.tasks}
               viewMode={viewMode}
               hideWeekends={hideWeekends}
+              showGrid={showGrid}
               selectedId={primarySelectedId}
               selectedIds={selectedIds}
               animatingTask={animatingTask}
@@ -893,6 +914,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               tasks={store.tasks}
               viewMode={viewMode}
               hideWeekends={hideWeekends}
+              showGrid={showGrid}
               ganttScrollRef={ganttScrollRef}
               resourceHours={resourceHours}
               onHoursChange={handleResourceHoursChange}

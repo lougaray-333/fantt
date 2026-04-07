@@ -11,8 +11,8 @@
   --color-accent-light: rgba(229, 34, 34, 0.1);
   --color-bar-default: #E52222;
   --color-today: #E52222;
-  --color-weekend: #f7f7f7;
-  --color-grid: #f0f0f0;
+  --color-weekend: #f3f3f3;
+  --color-grid: #e4e4e4;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;
   --font-sans: "Inter", sans-serif;
@@ -31,8 +31,8 @@
   --color-accent-light: rgba(229, 34, 34, 0.12);
   --color-bar-default: #E52222;
   --color-today: #E52222;
-  --color-weekend: #050505;
-  --color-grid: #080808;
+  --color-weekend: #080808;
+  --color-grid: #1c1c1c;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;
 }
