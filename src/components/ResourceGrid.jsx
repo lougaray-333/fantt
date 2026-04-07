@@ -34,6 +34,7 @@ export default memo(function ResourceGrid({
   hiddenRoles,
   onHideRole,
   onShowRole,
+  week1Monday = null,
   roleNames,
   onRoleNameChange,
   roleRates,
@@ -80,13 +81,11 @@ export default memo(function ResourceGrid({
   }, [rangeStart, totalDays, skipWeekends]);
 
   // Week spans — groups of consecutive dates within the same Mon–Sun week.
-  // Includes ALL weeks (even pre-project ones) so flex positioning matches the date columns.
-  // Only labels weeks >= W1 (same filter as GanttChart).
+  // Uses week1Monday passed from GanttEditor (derived from live store.tasks)
+  // so labels stay in sync with the Gantt header during drag.
   const weekSpans = useMemo(() => {
-    if (dates.length === 0 || tasks.length === 0) return [];
-    let earliest = tasks[0].start;
-    for (const t of tasks) if (t.start < earliest) earliest = t.start;
-    const week1Monday = getMonday(earliest);
+    if (dates.length === 0 || !week1Monday) return [];
+    const w1 = new Date(week1Monday + 'T00:00:00');
     const spans = [];
     let i = 0;
     while (i < dates.length) {
@@ -94,12 +93,12 @@ export default memo(function ResourceGrid({
       let j = i;
       while (j < dates.length && getMonday(dates[j].str).getTime() === monday.getTime()) j++;
       const count = j - i;
-      const weekNum = Math.round(diffDays(week1Monday, monday) / 7) + 1;
+      const weekNum = Math.round(diffDays(w1, monday) / 7) + 1;
       spans.push({ startIdx: i, count, width: count * colWidth, label: weekNum >= 1 ? `W${weekNum}` : '', first: i === 0 });
       i = j;
     }
     return spans;
-  }, [dates, colWidth, tasks]);
+  }, [dates, colWidth, week1Monday]);
 
   // Dates covered by at least one task
   const coveredDates = useMemo(() => {

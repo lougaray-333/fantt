@@ -3,7 +3,7 @@ import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, 
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
-import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays, diffDays, getDateRange } from '../utils/dates';
+import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays, diffDays, getDateRange, getMonday } from '../utils/dates';
 import GanttChart, { COL_WIDTHS } from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
@@ -282,6 +282,14 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const dragRefDateRef = useRef(null);
   // Resize tracking — capture original end so we can shift dependent hours on release
   const resizeOrigEndRef = useRef(null);
+
+  // Derive week1Monday from live tasks so ResourceGrid stays in sync during drag
+  const week1Monday = useMemo(() => {
+    if (store.tasks.length === 0) return null;
+    let earliest = store.tasks[0].start;
+    for (const t of store.tasks) if (t.start < earliest) earliest = t.start;
+    return formatDate(getMonday(new Date(earliest + 'T00:00:00')));
+  }, [store.tasks]);
 
   // Scroll sync refs — gantt drives, resource follows
   const ganttScrollRef = useRef(null);
@@ -1013,6 +1021,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               hiddenRoles={hiddenRoles}
               onHideRole={handleHideRole}
               onShowRole={handleShowRole}
+              week1Monday={week1Monday}
               roleNames={roleNames}
               onRoleNameChange={handleRoleNameChange}
               roleRates={roleRates}
