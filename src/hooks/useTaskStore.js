@@ -82,6 +82,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const taskCountRef = useRef(0);
   const dragSnapshotRef = useRef(null);
+  const resizeSnapshotRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const lastAnimatedRef = useRef(0);
@@ -386,6 +387,105 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
     });
   }, [touchProject, recordHistory]);
 
+  const beginResize = useCallback(() => {
+    setTasks((current) => {
+      resizeSnapshotRef.current = current;
+      return current;
+    });
+  }, []);
+
+  const resizeMove = useCallback((taskId, updates) => {
+    const snapshot = resizeSnapshotRef.current;
+    if (!snapshot) {
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...updates } : t));
+      return;
+    }
+
+    const dependents = getDependents(taskId, snapshot);
+    const affectedIds = new Set([taskId, ...dependents]);
+
+    const recompute = (origStart, origEnd, newStart) => {
+      const snapped = snapToMonday(newStart);
+      const bizDuration = businessDaysBetween(
+        new Date(origStart + 'T00:00:00'),
+        addDays(new Date(origEnd + 'T00:00:00'), 1)
+      );
+      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1) : 0;
+      return { start: formatDate(snapped), end: formatDate(addDays(snapped, calOffset)) };
+    };
+
+    const nextBizDay = (endDateStr) => {
+      const d = addDays(new Date(endDateStr + 'T00:00:00'), 1);
+      return snapToMonday(d);
+    };
+
+    const updatedMap = new Map(snapshot.map((t) => [t.id, t]));
+
+    // Apply resize to primary task (may change start or end)
+    const primary = snapshot.find((t) => t.id === taskId);
+    updatedMap.set(taskId, { ...primary, ...updates });
+
+    // Cascade dependents in dependency order
+    const toProcess = [...dependents];
+    const processed = new Set([taskId]);
+    let guard = 0;
+    while (toProcess.length > 0 && guard++ < 500) {
+      const id = toProcess.shift();
+      const task = snapshot.find((t) => t.id === id);
+      if (!task) { processed.add(id); continue; }
+
+      const pendingDeps = (task.dependencies || []).filter((d) => affectedIds.has(d) && !processed.has(d));
+      if (pendingDeps.length > 0) { toProcess.push(id); continue; }
+
+      let latestEnd = null;
+      for (const depId of (task.dependencies || [])) {
+        const dep = updatedMap.get(depId);
+        if (!dep) continue;
+        if (!latestEnd || dep.end > latestEnd) latestEnd = dep.end;
+      }
+
+      if (latestEnd) {
+        const newStart = nextBizDay(latestEnd);
+        const { start: s, end: e } = recompute(task.start, task.end, newStart);
+        updatedMap.set(id, { ...task, start: s, end: e });
+      }
+      processed.add(id);
+    }
+
+    setTasks(snapshot.map((t) => updatedMap.get(t.id) || t));
+  }, []);
+
+  const endResize = useCallback(() => {
+    const snapshot = resizeSnapshotRef.current;
+    resizeSnapshotRef.current = null;
+
+    if (!snapshot || !isConfigured) return;
+
+    setTasks((current) => {
+      const changes = current.filter((t) => {
+        const orig = snapshot.find((s) => s.id === t.id);
+        return orig && (orig.start !== t.start || orig.end !== t.end);
+      });
+
+      for (const task of changes) {
+        recentlyWrittenRef.current.set(task.id, Date.now());
+        const orig = snapshot.find((s) => s.id === task.id);
+        supabase
+          .from('tasks')
+          .update({ start_date: task.start, end_date: task.end })
+          .eq('id', task.id)
+          .then(() => {
+            recordHistory('resize', task, {
+              dates: { from: { start: orig.start, end: orig.end }, to: { start: task.start, end: task.end } }
+            });
+          });
+      }
+
+      if (changes.length > 0) touchProject();
+      return current;
+    });
+  }, [touchProject, recordHistory]);
+
   const deleteTask = useCallback((id) => {
     taskCountRef.current = Math.max(0, taskCountRef.current - 1);
     let deletedTask = null;
@@ -522,6 +622,9 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
     beginDrag,
     dragMove,
     endDrag,
+    beginResize,
+    resizeMove,
+    endResize,
     deleteTask,
     reorderTasks,
     importTasks,

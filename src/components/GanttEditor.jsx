@@ -872,9 +872,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                   handleSelect(id, false);
                 }
               }}
-              onTaskUpdate={(id, updates) => { store.updateTask(id, updates); }}
+              onTaskUpdate={(id, updates) => { store.resizeMove(id, updates); }}
               onBeginDrag={(taskId) => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(taskId); }}
-              onBeginResize={() => snap()}
+              onBeginResize={() => { snap(); store.beginResize(); }}
               onDragMove={(taskId, daysDelta) => {
                 if (!dragRefDateRef.current) {
                   const task = store.tasks.find(t => t.id === taskId);
@@ -894,6 +894,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                 dragRefDateRef.current = null;
               }}
               onResizeEnd={(taskId) => {
+                store.endResize();
                 setAnimatingTask({ id: taskId, type: 'bounce-h' });
                 setTimeout(() => setAnimatingTask(null), 300);
               }}
