@@ -210,7 +210,7 @@ export default memo(function GanttChart({
       didDragRef.current = false;
 
       if (type === 'move') onBeginDrag(task.id);
-      if (type === 'resize-start' || type === 'resize-end') onBeginResize?.();
+      if (type === 'resize-start' || type === 'resize-end') onBeginResize?.(task.id, type);
 
       function onMove(ev) {
         const dx = ev.clientX - startX;

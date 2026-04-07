@@ -50,6 +50,36 @@ function shiftAllHours(resourceHours, calendarDelta, refDate) {
   return shifted;
 }
 
+// Like shiftAllHours but only shifts entries AFTER cutoffDateStr (for resize cascades).
+// Hours on the primary task itself stay in place; only dependent task hours move.
+function shiftHoursAfterDate(resourceHours, cutoffDateStr, calendarDelta, refDate) {
+  if (calendarDelta === 0) return resourceHours;
+
+  const dest = addDays(refDate, calendarDelta);
+  const bizDelta = calendarDelta >= 0
+    ? businessDaysBetween(refDate, dest)
+    : -businessDaysBetween(dest, refDate);
+
+  if (bizDelta === 0) return resourceHours;
+
+  const shifted = {};
+  for (const [role, dates] of Object.entries(resourceHours)) {
+    const newDates = {};
+    for (const [dateStr, hours] of Object.entries(dates)) {
+      if (hours <= 0) continue;
+      if (dateStr > cutoffDateStr) {
+        const newCalDays = businessToCalendarDays(dateStr, bizDelta);
+        const newDateStr = formatDate(addDays(dateStr, newCalDays));
+        newDates[newDateStr] = hours;
+      } else {
+        newDates[dateStr] = hours;
+      }
+    }
+    shifted[role] = newDates;
+  }
+  return shifted;
+}
+
 export default function GanttEditor({ projectId, projectName, email, onBack, isCollaborator = false }) {
   const history = useHistory();
   const store = useTaskStore(projectId, {
@@ -250,6 +280,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   // Track drag delta and reference date for shifting resource hours
   const dragDeltaRef = useRef(0);
   const dragRefDateRef = useRef(null);
+  // Resize tracking — capture original end so we can shift dependent hours on release
+  const resizeOrigEndRef = useRef(null);
 
   // Scroll sync refs — gantt drives, resource follows
   const ganttScrollRef = useRef(null);
@@ -894,7 +926,17 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               }}
               onTaskUpdate={(id, updates) => { store.resizeMove(id, updates); }}
               onBeginDrag={(taskId) => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(taskId); }}
-              onBeginResize={() => { snap(); store.beginResize(); }}
+              onBeginResize={(taskId, type) => {
+                snap();
+                store.beginResize();
+                // Capture original end so we can shift dependent hours on release
+                if (type === 'resize-end') {
+                  const task = store.tasks.find(t => t.id === taskId);
+                  resizeOrigEndRef.current = task ? task.end : null;
+                } else {
+                  resizeOrigEndRef.current = null;
+                }
+              }}
               onDragMove={(taskId, daysDelta) => {
                 if (!dragRefDateRef.current) {
                   const task = store.tasks.find(t => t.id === taskId);
@@ -915,6 +957,19 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               }}
               onResizeEnd={(taskId) => {
                 store.endResize();
+                // Shift hours that fall after the primary task's original end
+                // so dependent tasks' allocated hours follow the cascade
+                const origEnd = resizeOrigEndRef.current;
+                if (origEnd) {
+                  const task = stateRef.current.tasks.find(t => t.id === taskId);
+                  if (task && task.end !== origEnd) {
+                    const calDelta = diffDays(new Date(origEnd + 'T00:00:00'), new Date(task.end + 'T00:00:00'));
+                    if (calDelta !== 0) {
+                      setResourceHours(prev => shiftHoursAfterDate(prev, origEnd, calDelta, new Date(origEnd + 'T00:00:00')));
+                    }
+                  }
+                  resizeOrigEndRef.current = null;
+                }
                 setAnimatingTask({ id: taskId, type: 'bounce-h' });
                 setTimeout(() => setAnimatingTask(null), 300);
               }}
