@@ -4,9 +4,13 @@ import { fetchActivities } from '../data/activityDatabase';
 import { Lock, ArrowLeft, Users, FolderOpen, ListTodo, TrendingUp, Search, Plus, Pencil, Trash2, X, Bug, Save, Loader2 } from 'lucide-react';
 
 const GODMODE_SECRET = import.meta.env.VITE_GODMODE_SECRET;
+const AUTH_KEY = 'fantt-godmode-auth';
 
 export default function GodMode() {
-  const [authed, setAuthed] = useState(!GODMODE_SECRET);
+  const [authed, setAuthed] = useState(() => {
+    if (!GODMODE_SECRET) return true;
+    return localStorage.getItem(AUTH_KEY) === btoa(GODMODE_SECRET);
+  });
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
 
@@ -21,6 +25,7 @@ export default function GodMode() {
           <form onSubmit={(e) => {
             e.preventDefault();
             if (passphrase === GODMODE_SECRET) {
+              localStorage.setItem(AUTH_KEY, btoa(GODMODE_SECRET));
               setAuthed(true);
               setError('');
             } else {
