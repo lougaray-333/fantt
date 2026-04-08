@@ -507,7 +507,7 @@ export default memo(function GanttChart({
             {h.isWeekend && (
               <rect x={h.x} y={0} width={h.width} height={bodyHeight} fill="var(--color-weekend)" />
             )}
-            {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={1} />}
+            {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={h.sublabel === 'Mon' ? 1.5 : 1} strokeOpacity={h.sublabel === 'Mon' ? 0.9 : 0.7} />}
           </g>
         ))}
 

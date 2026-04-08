@@ -505,7 +505,7 @@ export default memo(function ResourceGrid({
                       const personName = (roleNames || {})[entry.role] || '';
                       return (
                         <div key={entry.role} className="flex" style={{ height: ROW_H }}>
-                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role border-b border-border/40">
+                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role">
                             <div className="flex items-center px-2 h-full gap-1">
                               <button
                                 onClick={() => onHideRole(entry.role)}
