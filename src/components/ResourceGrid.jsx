@@ -505,8 +505,8 @@ export default memo(function ResourceGrid({
                       const activeLevel = getActiveLevel(entry.role);
                       const personName = (roleNames || {})[entry.role] || '';
                       return (
-                        <div key={entry.role} className="flex" style={{ height: ROW_H }}>
-                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role">
+                        <div key={entry.role} className="flex group/role" style={{ height: ROW_H }}>
+                          <RoleCell className="group-hover/role:bg-bg-alt/50 transition-colors">
                             <div className="flex items-center px-2 h-full gap-1">
                               <button
                                 onClick={() => onHideRole(entry.role)}
@@ -582,7 +582,7 @@ export default memo(function ResourceGrid({
                               <div
                                 key={d.str}
                                 className={`shrink-0 ${rowBorder} flex items-center justify-center
-                                  ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                                  ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'group-hover/role:bg-bg-alt/30'}`}
                                 style={{
                                   width: colWidth, height: ROW_H,
                                   borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
