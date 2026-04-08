@@ -12,7 +12,7 @@
   --color-bar-default: #E52222;
   --color-today: #E52222;
   --color-weekend: #f3f3f3;
-  --color-grid: #e4e4e4;
+  --color-grid: #d0d0d0;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;
   --font-sans: "Inter", sans-serif;
@@ -32,7 +32,7 @@
   --color-bar-default: #E52222;
   --color-today: #E52222;
   --color-weekend: #080808;
-  --color-grid: #1c1c1c;
+  --color-grid: #2e2e2e;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;
 }

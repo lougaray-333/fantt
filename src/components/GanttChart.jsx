@@ -41,6 +41,14 @@ export default memo(function GanttChart({
   const panRef = useRef(null);
   const didDragRef = useRef(false);
   const [tooltip, setTooltip] = useState(null); // { x, y, task }
+  const [containerHeight, setContainerHeight] = useState(600);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setContainerHeight(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollRef]);
   const tooltipRafRef = useRef(null);
   const colWidth = COL_WIDTHS[viewMode];
   const groups = getAllGroups(tasks);
@@ -50,7 +58,7 @@ export default memo(function GanttChart({
   const skipWeekends = hideWeekends && viewMode === 'day';
   const totalDays = skipWeekends ? businessDaysBetween(rangeStart, rangeEnd) : diffDays(rangeStart, rangeEnd);
   const chartWidth = Math.max(totalDays * colWidth, 800);
-  const bodyHeight = tasks.length * ROW_HEIGHT + 20;
+  const bodyHeight = Math.max(tasks.length * ROW_HEIGHT + 20, containerHeight);
   const chartHeight = HEADER_HEIGHT + bodyHeight;
 
   // O(1) dep lookup — replaces per-render findIndex calls in connector loop
