@@ -478,7 +478,7 @@ export default memo(function ResourceGrid({
                 return (
                   <div key={dept}>
                     {/* Department header */}
-                    <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
+                    <div className="flex" style={{ height: ROW_H }}>
                       <DeptCell>
                         <div className="flex items-center px-3 h-full">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{dept}</span>
@@ -493,6 +493,7 @@ export default memo(function ResourceGrid({
                             width: colWidth, height: ROW_H,
                             borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
                             borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
+                            borderBottom: '1px solid var(--color-border)',
                           }}
                         />
                       ))}
