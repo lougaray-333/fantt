@@ -284,7 +284,7 @@ export default memo(function ResourceGrid({
   // Render a dept header role cell
   const DeptCell = ({ children }) => (
     <div
-      className={`${stickyLeft} shrink-0 border-r border-border bg-bg-alt/60`}
+      className={`${stickyLeft} shrink-0 border-r border-border bg-sidebar`}
       style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
     >
       {children}
@@ -487,7 +487,7 @@ export default memo(function ResourceGrid({
                       {dates.map((d) => (
                         <div
                           key={d.str}
-                          className={`shrink-0 bg-bg-alt/60
+                          className={`shrink-0
                             ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                           style={{
                             width: colWidth, height: ROW_H,
