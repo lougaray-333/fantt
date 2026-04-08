@@ -80,22 +80,31 @@ export default memo(function ResourceGrid({
     return arr;
   }, [rangeStart, totalDays, skipWeekends]);
 
-  // Week spans — groups of consecutive dates within the same Mon–Sun week.
-  // Uses week1Monday passed from GanttEditor (derived from live store.tasks)
-  // so labels stay in sync with the Gantt header during drag.
+  // Week spans — Mon–Fri only; weekends get their own unlabeled span.
+  // Uses week1Monday passed from GanttEditor so labels stay in sync with Gantt.
   const weekSpans = useMemo(() => {
     if (dates.length === 0 || !week1Monday) return [];
     const w1 = new Date(week1Monday + 'T00:00:00');
     const spans = [];
     let i = 0;
     while (i < dates.length) {
-      const monday = getMonday(dates[i].str);
-      let j = i;
-      while (j < dates.length && getMonday(dates[j].str).getTime() === monday.getTime()) j++;
-      const count = j - i;
-      const weekNum = Math.round(diffDays(w1, monday) / 7) + 1;
-      spans.push({ startIdx: i, count, width: count * colWidth, label: weekNum >= 1 ? `W${weekNum}` : '', first: i === 0 });
-      i = j;
+      const d = dates[i];
+      if (d.isWeekend) {
+        // Group consecutive weekend days into an unlabeled span
+        let j = i;
+        while (j < dates.length && dates[j].isWeekend) j++;
+        spans.push({ startIdx: i, count: j - i, width: (j - i) * colWidth, label: '', isWeekend: true, first: i === 0 });
+        i = j;
+      } else {
+        // Group Mon–Fri of the same ISO week
+        const monday = getMonday(d.str);
+        let j = i;
+        while (j < dates.length && !dates[j].isWeekend && getMonday(dates[j].str).getTime() === monday.getTime()) j++;
+        const count = j - i;
+        const weekNum = Math.round(diffDays(w1, monday) / 7) + 1;
+        spans.push({ startIdx: i, count, width: count * colWidth, label: weekNum >= 1 ? `W${weekNum}` : '', isWeekend: false, first: i === 0 });
+        i = j;
+      }
     }
     return spans;
   }, [dates, colWidth, week1Monday]);
@@ -422,12 +431,14 @@ export default memo(function ResourceGrid({
                 {weekSpans.map((w) => (
                   <div
                     key={w.label + w.startIdx}
-                    className="shrink-0 flex items-center justify-center relative"
+                    className={`shrink-0 flex items-center justify-center relative ${w.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                     style={{ width: w.width, height: ROW_H }}
                   >
-                    <span className="text-[9px] font-semibold text-text-muted/60 uppercase tracking-wider">{w.label}</span>
+                    {!w.isWeekend && (
+                      <span className="text-[9px] font-semibold text-text-muted/60 uppercase tracking-wider">{w.label}</span>
+                    )}
                     {!w.first && showGrid && (
-                      <div className="absolute left-0 top-1 bottom-1 w-px bg-[var(--color-grid)]" />
+                      <div className={`absolute left-0 top-0 bottom-0 w-px ${w.isWeekend ? 'bg-[var(--color-grid)]/40' : 'bg-[var(--color-grid)]'}`} />
                     )}
                   </div>
                 ))}
@@ -445,10 +456,14 @@ export default memo(function ResourceGrid({
                   <div
                     key={d.str}
                     onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
-                    className={`shrink-0 flex flex-col items-center justify-center text-center ${colBorder} cursor-pointer
+                    className={`shrink-0 flex flex-col items-center justify-center text-center cursor-pointer
                       hover:bg-accent/15 transition-colors select-none
                       ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
-                    style={{ width: colWidth, height: ROW_H }}
+                    style={{
+                      width: colWidth, height: ROW_H,
+                      borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
+                      borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
+                    }}
                   >
                     <span className={`text-[9px] leading-none ${isColActive(d) ? 'text-accent font-bold' : 'text-text'}`}>{d.day}</span>
                     <span className={`text-[8px] leading-none ${isColActive(d) ? 'text-accent' : 'text-text-muted'}`}>{d.abbr}</span>
@@ -472,9 +487,13 @@ export default memo(function ResourceGrid({
                       {dates.map((d) => (
                         <div
                           key={d.str}
-                          className={`shrink-0 ${colBorder} bg-bg-alt/60
+                          className={`shrink-0 bg-bg-alt/60
                             ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
-                          style={{ width: colWidth, height: ROW_H }}
+                          style={{
+                            width: colWidth, height: ROW_H,
+                            borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
+                            borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
+                          }}
                         />
                       ))}
                     </div>
@@ -485,8 +504,8 @@ export default memo(function ResourceGrid({
                       const activeLevel = getActiveLevel(entry.role);
                       const personName = (roleNames || {})[entry.role] || '';
                       return (
-                        <div key={entry.role} className={`flex ${rowBorder}`} style={{ height: ROW_H }}>
-                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role">
+                        <div key={entry.role} className="flex" style={{ height: ROW_H }}>
+                          <RoleCell className="hover:bg-bg-alt/50 transition-colors group/role border-b border-border/40">
                             <div className="flex items-center px-2 h-full gap-1">
                               <button
                                 onClick={() => onHideRole(entry.role)}
@@ -561,9 +580,13 @@ export default memo(function ResourceGrid({
                             return (
                               <div
                                 key={d.str}
-                                className={`shrink-0 ${colBorder} flex items-center justify-center
+                                className={`shrink-0 ${rowBorder} flex items-center justify-center
                                   ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
-                                style={{ width: colWidth, height: ROW_H }}
+                                style={{
+                                  width: colWidth, height: ROW_H,
+                                  borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
+                                  borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
+                                }}
                                 title={orphaned ? 'No activity on this date' : undefined}
                               >
                                 <input
