@@ -1049,7 +1049,21 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                       setResourceHours(prev => {
                         let result = prev;
 
-                        // Step 1: fill new days of the primary task with origEnd's hours
+                        // Step 1: shift cascade dependent task hours first (before the fill),
+                        // so dependent hours vacate the new extension days before we populate them.
+                        // Protect only the primary task's ORIGINAL range — not the new end day —
+                        // so a cascaded task whose original start falls on the new extension day
+                        // can still shift forward instead of being blocked.
+                        if (cascadedTasks.length > 0) {
+                          const stationaryRanges = stateRef.current.tasks
+                            .filter(t => t.id !== taskId && !cascadedIds.has(t.id))
+                            .map(t => ({ start: t.start, end: t.end }));
+                          stationaryRanges.push({ start: primaryTask.start, end: origEnd });
+                          result = shiftHoursForMovedTasks(result, cascadedTasks, stationaryRanges);
+                        }
+
+                        // Step 2: fill new days of the primary task with origEnd's hours.
+                        // Runs after cascade so we're not accidentally shifting freshly-filled hours.
                         if (newTaskDays.length > 0) {
                           const filled = {};
                           for (const [role, dates] of Object.entries(result)) {
@@ -1065,16 +1079,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                             }
                           }
                           result = filled;
-                        }
-
-                        // Step 2: shift cascade dependent task hours (scoped to their ranges)
-                        if (cascadedTasks.length > 0) {
-                          const stationaryRanges = stateRef.current.tasks
-                            .filter(t => t.id !== taskId && !cascadedIds.has(t.id))
-                            .map(t => ({ start: t.start, end: t.end }));
-                          // Include primary task's NEW range so its hours aren't moved again
-                          stationaryRanges.push({ start: primaryTask.start, end: primaryTask.end });
-                          result = shiftHoursForMovedTasks(result, cascadedTasks, stationaryRanges);
                         }
 
                         return result;
