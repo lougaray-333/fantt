@@ -705,8 +705,7 @@ export default memo(function ResourceGrid({
                 {dates.map((d) => (
                   <div
                     key={d.str}
-                    className={`shrink-0 border-r border-border/20 bg-bg-alt/60
-                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                    className={`shrink-0 border-r border-border/20 ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: colWidth, height: ROW_H }}
                   />
                 ))}
