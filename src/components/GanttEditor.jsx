@@ -923,7 +923,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         <div ref={splitContainerRef} className="flex flex-1 flex-col min-h-0">
           <div
             ref={ganttScrollRef}
-            className={`flex overflow-auto items-start ${budgetCollapsed ? 'flex-1' : 'shrink-0'}`}
+            className={`isolate flex overflow-auto items-start ${budgetCollapsed ? 'flex-1' : 'shrink-0'}`}
             style={budgetCollapsed ? {} : { height: `${splitPct}%` }}
           >
             <InlineTaskTable
@@ -1116,8 +1116,10 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           )}
 
           <div
-            className={`relative z-20 bg-sidebar flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
-            style={budgetCollapsed ? {} : { height: `calc(${100 - splitPct}% - 6px)` }}
+            className={`relative z-[100] bg-sidebar flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
+            style={budgetCollapsed
+              ? { background: 'var(--color-sidebar)' }
+              : { height: `calc(${100 - splitPct}% - 6px)`, background: 'var(--color-sidebar)' }}
           >
           <ResourceGrid
               tasks={store.tasks}
