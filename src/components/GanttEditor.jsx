@@ -19,55 +19,58 @@ import { supabase, isConfigured } from '../lib/supabase';
 
 const ChangeHistory = lazy(() => import('./ChangeHistory'));
 
-// Shift resource hours by business days derived from the calendar delta.
-// Tasks shift by calendarDelta calendar days. We figure out how many business
-// days that represents, then shift each hour entry by that many business days.
-// This guarantees weekdays map 1:1 to weekdays — no collisions, no weekends.
-function shiftAllHours(resourceHours, calendarDelta, refDate) {
-  if (calendarDelta === 0) return resourceHours;
-
-  // How many business days does this calendar shift represent?
-  // Use refDate (the dragged task's original start) as reference.
-  const dest = addDays(refDate, calendarDelta);
-  const bizDelta = calendarDelta >= 0
-    ? businessDaysBetween(refDate, dest)
-    : -businessDaysBetween(dest, refDate);
-
-  if (bizDelta === 0) return resourceHours;
-
-  const shifted = {};
-  for (const [role, dates] of Object.entries(resourceHours)) {
-    const newDates = {};
-    for (const [dateStr, hours] of Object.entries(dates)) {
-      if (hours <= 0) continue;
-      // Shift this entry by bizDelta business days
-      const newCalDays = businessToCalendarDays(dateStr, bizDelta);
-      const newDateStr = formatDate(addDays(dateStr, newCalDays));
-      newDates[newDateStr] = hours;
+/**
+ * Shift resource hours only for dates that fall within moved tasks' original
+ * date ranges AND are not also covered by a stationary (non-moved) task.
+ *
+ * movedTasks:       [{ origStart, origEnd, calDelta }]
+ * stationaryRanges: [{ start, end }]  — tasks that did NOT move
+ */
+function shiftHoursForMovedTasks(resourceHours, movedTasks, stationaryRanges) {
+  // 1. Build the set of dates still covered by non-moved tasks
+  const stationaryDates = new Set();
+  for (const { start, end } of stationaryRanges) {
+    let cur = new Date(start + 'T00:00:00');
+    const endDate = new Date(end + 'T00:00:00');
+    while (cur <= endDate) {
+      stationaryDates.add(formatDate(cur));
+      cur = addDays(cur, 1);
     }
-    shifted[role] = newDates;
   }
-  return shifted;
-}
 
-// Like shiftAllHours but only shifts entries AFTER cutoffDateStr (for resize cascades).
-// Hours on the primary task itself stay in place; only dependent task hours move.
-function shiftHoursAfterDate(resourceHours, cutoffDateStr, calendarDelta, refDate) {
-  if (calendarDelta === 0) return resourceHours;
+  // 2. For each moved task, map its exclusive dates → bizDelta
+  //    First task to claim a date wins (handles overlapping moved tasks)
+  const dateShiftMap = new Map(); // dateStr → bizDelta
+  for (const { origStart, origEnd, calDelta } of movedTasks) {
+    if (calDelta === 0) continue;
+    const refDate = new Date(origStart + 'T00:00:00');
+    const dest = addDays(refDate, calDelta);
+    const bizDelta = calDelta >= 0
+      ? businessDaysBetween(refDate, dest)
+      : -businessDaysBetween(dest, refDate);
+    if (bizDelta === 0) continue;
 
-  const dest = addDays(refDate, calendarDelta);
-  const bizDelta = calendarDelta >= 0
-    ? businessDaysBetween(refDate, dest)
-    : -businessDaysBetween(dest, refDate);
+    let cur = new Date(origStart + 'T00:00:00');
+    const endDate = new Date(origEnd + 'T00:00:00');
+    while (cur <= endDate) {
+      const dateStr = formatDate(cur);
+      if (!stationaryDates.has(dateStr) && !dateShiftMap.has(dateStr)) {
+        dateShiftMap.set(dateStr, bizDelta);
+      }
+      cur = addDays(cur, 1);
+    }
+  }
 
-  if (bizDelta === 0) return resourceHours;
+  if (dateShiftMap.size === 0) return resourceHours;
 
-  const shifted = {};
+  // 3. Rebuild resourceHours, moving only the mapped dates
+  const result = {};
   for (const [role, dates] of Object.entries(resourceHours)) {
     const newDates = {};
     for (const [dateStr, hours] of Object.entries(dates)) {
       if (hours <= 0) continue;
-      if (dateStr > cutoffDateStr) {
+      const bizDelta = dateShiftMap.get(dateStr);
+      if (bizDelta !== undefined) {
         const newCalDays = businessToCalendarDays(dateStr, bizDelta);
         const newDateStr = formatDate(addDays(dateStr, newCalDays));
         newDates[newDateStr] = hours;
@@ -75,9 +78,9 @@ function shiftHoursAfterDate(resourceHours, cutoffDateStr, calendarDelta, refDat
         newDates[dateStr] = hours;
       }
     }
-    shifted[role] = newDates;
+    result[role] = newDates;
   }
-  return shifted;
+  return result;
 }
 
 export default function GanttEditor({ projectId, projectName, email, onBack, isCollaborator = false }) {
@@ -185,6 +188,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
 
   // Load budget data from Supabase on mount (falls back to localStorage init above)
   const budgetLoadedRef = useRef(false);
+  // Guard: don't save to Supabase until after the initial load completes, to prevent
+  // overwriting real data with an empty localStorage state on first load / cache clear.
+  const budgetReadyToSaveRef = useRef(!isConfigured);
   useEffect(() => {
     if (!isConfigured || !projectId || budgetLoadedRef.current) return;
     budgetLoadedRef.current = true;
@@ -195,36 +201,44 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       .single()
       .then(({ data }) => {
         if (data) {
-          if (data.resource_hours) setResourceHours(data.resource_hours);
-          if (data.oop_expenses) setOopExpenses(data.oop_expenses);
-          if (data.hidden_roles) setHiddenRoles(data.hidden_roles);
-          if (data.role_names) setRoleNames(data.role_names);
-          if (data.role_rates) setRoleRates(data.role_rates);
+          if (data.resource_hours != null) setResourceHours(data.resource_hours);
+          if (data.oop_expenses != null) setOopExpenses(data.oop_expenses);
+          if (data.hidden_roles != null) setHiddenRoles(data.hidden_roles);
+          if (data.role_names != null) setRoleNames(data.role_names);
+          if (data.role_rates != null) setRoleRates(data.role_rates);
         }
+        budgetReadyToSaveRef.current = true;
       });
   }, [projectId]);
 
-  // Auto-save budget data to localStorage + Supabase (debounced)
+  // Auto-save budget data to localStorage + Supabase (debounced).
+  // IMPORTANT: read from stateRef.current inside the callback, NOT from the closed-over
+  // state variables. The effect's closure captures the values at render time, but the
+  // callback fires 500ms later — by then stateRef is always current (updated earlier in
+  // the same commit by the stateRef sync effect above). Without this, a race between the
+  // Supabase initial load and the 500ms timer can save a stale {} to Supabase.
   const saveBudgetRef = useRef(null);
   const lastLocalBudgetSaveRef = useRef(0);
   useEffect(() => {
     clearTimeout(saveBudgetRef.current);
     saveBudgetRef.current = setTimeout(() => {
-      localStorage.setItem(budgetKey + '-hours', JSON.stringify(resourceHours));
-      localStorage.setItem(budgetKey + '-oop', JSON.stringify(oopExpenses));
-      localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hiddenRoles));
-      localStorage.setItem(budgetKey + '-names', JSON.stringify(roleNames));
-      localStorage.setItem(budgetKey + '-rates', JSON.stringify(roleRates));
-      // Sync to Supabase
-      if (isConfigured && projectId) {
+      const { resourceHours: hrs, oopExpenses: oop, hiddenRoles: hidden, roleNames: names, roleRates: rates } = stateRef.current;
+      localStorage.setItem(budgetKey + '-hours', JSON.stringify(hrs));
+      localStorage.setItem(budgetKey + '-oop', JSON.stringify(oop));
+      localStorage.setItem(budgetKey + '-hidden', JSON.stringify(hidden));
+      localStorage.setItem(budgetKey + '-names', JSON.stringify(names));
+      localStorage.setItem(budgetKey + '-rates', JSON.stringify(rates));
+      // Only sync to Supabase after the initial load has completed — prevents
+      // overwriting real data with an empty local state on first mount.
+      if (isConfigured && projectId && budgetReadyToSaveRef.current) {
         lastLocalBudgetSaveRef.current = Date.now();
         supabase.from('project_budgets').upsert({
           project_id: projectId,
-          resource_hours: resourceHours,
-          oop_expenses: oopExpenses,
-          hidden_roles: hiddenRoles,
-          role_names: roleNames,
-          role_rates: roleRates,
+          resource_hours: hrs,
+          oop_expenses: oop,
+          hidden_roles: hidden,
+          role_names: names,
+          role_rates: rates,
           updated_at: new Date().toISOString(),
         }).then(() => {});
       }
@@ -242,13 +256,16 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         table: 'project_budgets',
         filter: `project_id=eq.${projectId}`,
       }, ({ new: row }) => {
-        // Guard: if we just saved locally in the past 3 seconds, ignore (our own echo)
-        if (Date.now() - lastLocalBudgetSaveRef.current < 3000) return;
-        if (row.resource_hours) setResourceHours(row.resource_hours);
-        if (row.oop_expenses) setOopExpenses(row.oop_expenses);
-        if (row.hidden_roles) setHiddenRoles(row.hidden_roles);
-        if (row.role_names) setRoleNames(row.role_names);
-        if (row.role_rates) setRoleRates(row.role_rates);
+        // Guard 1: don't process realtime events before our own initial load finishes.
+        if (!budgetReadyToSaveRef.current) return;
+        // Guard 2: ignore echoes from our own saves (window matches the 30s auto-save interval).
+        // Use != null so empty objects {} don't accidentally overwrite local state.
+        if (Date.now() - lastLocalBudgetSaveRef.current < 30000) return;
+        if (row.resource_hours != null) setResourceHours(row.resource_hours);
+        if (row.oop_expenses != null) setOopExpenses(row.oop_expenses);
+        if (row.hidden_roles != null) setHiddenRoles(row.hidden_roles);
+        if (row.role_names != null) setRoleNames(row.role_names);
+        if (row.role_rates != null) setRoleRates(row.role_rates);
       })
       .subscribe();
     return () => supabase.removeChannel(ch);
@@ -259,7 +276,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   useEffect(() => {
     if (!isConfigured || !projectId) return;
     const interval = setInterval(() => {
-      // Budget is already synced via the debounced effect above, but force a fresh upsert
+      if (!budgetReadyToSaveRef.current) return;
+      // Update the echo guard timestamp so the realtime subscription ignores our own save
+      lastLocalBudgetSaveRef.current = Date.now();
       supabase.from('project_budgets').upsert({
         project_id: projectId,
         resource_hours: stateRef.current.resourceHours,
@@ -277,9 +296,10 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     return () => clearInterval(interval);
   }, [projectId]);
 
-  // Track drag delta and reference date for shifting resource hours
-  const dragDeltaRef = useRef(0);
-  const dragRefDateRef = useRef(null);
+  // Snapshots of all tasks taken just before a drag/resize begins,
+  // so we can compute per-task calendar deltas on release.
+  const preDragTasksRef   = useRef(null);
+  const preResizeTasksRef = useRef(null);
   // Resize tracking — capture original end so we can shift dependent hours on release
   const resizeOrigEndRef = useRef(null);
 
@@ -356,6 +376,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     snap();
     setRoleRates((prev) => ({ ...prev, [role]: Number(rate) || 0 }));
   }, []);
+
 
   const handleResourceHoursChange = useCallback((role, dateStr, hours) => {
     snap();
@@ -933,11 +954,15 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                 }
               }}
               onTaskUpdate={(id, updates) => { store.resizeMove(id, updates); }}
-              onBeginDrag={(taskId) => { snap(); dragDeltaRef.current = 0; dragRefDateRef.current = null; store.beginDrag(taskId); }}
+              onBeginDrag={(taskId) => {
+                snap();
+                preDragTasksRef.current = store.tasks;
+                store.beginDrag(taskId);
+              }}
               onBeginResize={(taskId, type) => {
                 snap();
                 store.beginResize();
-                // Capture original end so we can shift dependent hours on release
+                preResizeTasksRef.current = store.tasks;
                 if (type === 'resize-end') {
                   const task = store.tasks.find(t => t.id === taskId);
                   resizeOrigEndRef.current = task ? task.end : null;
@@ -946,38 +971,120 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                 }
               }}
               onDragMove={(taskId, daysDelta) => {
-                if (!dragRefDateRef.current) {
-                  const task = store.tasks.find(t => t.id === taskId);
-                  if (task) dragRefDateRef.current = task.start;
-                }
-                dragDeltaRef.current = daysDelta;
                 store.dragMove(taskId, daysDelta);
               }}
               onEndDrag={() => {
-                const delta = dragDeltaRef.current;
-                const refDate = dragRefDateRef.current;
-                if (delta !== 0 && refDate) {
-                  setResourceHours(prev => shiftAllHours(prev, delta, refDate));
+                const preTasks  = preDragTasksRef.current || [];
+                const postTasks = stateRef.current.tasks;
+
+                // Find every task that actually moved and its per-task calendar delta
+                const movedTasks = [];
+                const movedIds   = new Set();
+                for (const post of postTasks) {
+                  const pre = preTasks.find(t => t.id === post.id);
+                  if (pre && (pre.start !== post.start || pre.end !== post.end)) {
+                    movedTasks.push({
+                      origStart: pre.start,
+                      origEnd:   pre.end,
+                      calDelta:  diffDays(new Date(pre.start + 'T00:00:00'), new Date(post.start + 'T00:00:00')),
+                    });
+                    movedIds.add(post.id);
+                  }
                 }
+
+                if (movedTasks.length > 0) {
+                  const stationaryRanges = postTasks
+                    .filter(t => !movedIds.has(t.id))
+                    .map(t => ({ start: t.start, end: t.end }));
+                  setResourceHours(prev => shiftHoursForMovedTasks(prev, movedTasks, stationaryRanges));
+                }
+
                 store.endDrag();
-                dragDeltaRef.current = 0;
-                dragRefDateRef.current = null;
+                preDragTasksRef.current = null;
               }}
               onResizeEnd={(taskId) => {
                 store.endResize();
-                // Shift hours that fall after the primary task's original end
-                // so dependent tasks' allocated hours follow the cascade
-                const origEnd = resizeOrigEndRef.current;
+                const origEnd  = resizeOrigEndRef.current;
+                const preTasks = preResizeTasksRef.current || [];
+
                 if (origEnd) {
-                  const task = stateRef.current.tasks.find(t => t.id === taskId);
-                  if (task && task.end !== origEnd) {
-                    const calDelta = diffDays(new Date(origEnd + 'T00:00:00'), new Date(task.end + 'T00:00:00'));
+                  const primaryTask = stateRef.current.tasks.find(t => t.id === taskId);
+                  if (primaryTask && primaryTask.end !== origEnd) {
+                    const calDelta = diffDays(
+                      new Date(origEnd + 'T00:00:00'),
+                      new Date(primaryTask.end + 'T00:00:00')
+                    );
+
                     if (calDelta !== 0) {
-                      setResourceHours(prev => shiftHoursAfterDate(prev, origEnd, calDelta, new Date(origEnd + 'T00:00:00')));
+                      // New weekdays added to the primary task (extension only)
+                      const newTaskDays = [];
+                      if (calDelta > 0) {
+                        let cur = addDays(new Date(origEnd + 'T00:00:00'), 1);
+                        const finalEnd = new Date(primaryTask.end + 'T00:00:00');
+                        while (cur <= finalEnd) {
+                          if (!isWeekend(cur)) newTaskDays.push(formatDate(cur));
+                          cur = addDays(cur, 1);
+                        }
+                      }
+
+                      // Cascade: dependent tasks that also moved
+                      const cascadedTasks = [];
+                      const cascadedIds   = new Set();
+                      for (const post of stateRef.current.tasks) {
+                        if (post.id === taskId) continue;
+                        const pre = preTasks.find(t => t.id === post.id);
+                        if (pre && (pre.start !== post.start || pre.end !== post.end)) {
+                          cascadedTasks.push({
+                            origStart: pre.start,
+                            origEnd:   pre.end,
+                            calDelta:  diffDays(
+                              new Date(pre.start + 'T00:00:00'),
+                              new Date(post.start + 'T00:00:00')
+                            ),
+                          });
+                          cascadedIds.add(post.id);
+                        }
+                      }
+
+                      setResourceHours(prev => {
+                        let result = prev;
+
+                        // Step 1: fill new days of the primary task with origEnd's hours
+                        if (newTaskDays.length > 0) {
+                          const filled = {};
+                          for (const [role, dates] of Object.entries(result)) {
+                            const lastHours = dates[origEnd] ?? 0;
+                            if (lastHours > 0) {
+                              const roleDates = { ...dates };
+                              for (const d of newTaskDays) {
+                                if (!roleDates[d]) roleDates[d] = lastHours;
+                              }
+                              filled[role] = roleDates;
+                            } else {
+                              filled[role] = dates;
+                            }
+                          }
+                          result = filled;
+                        }
+
+                        // Step 2: shift cascade dependent task hours (scoped to their ranges)
+                        if (cascadedTasks.length > 0) {
+                          const stationaryRanges = stateRef.current.tasks
+                            .filter(t => t.id !== taskId && !cascadedIds.has(t.id))
+                            .map(t => ({ start: t.start, end: t.end }));
+                          // Include primary task's NEW range so its hours aren't moved again
+                          stationaryRanges.push({ start: primaryTask.start, end: primaryTask.end });
+                          result = shiftHoursForMovedTasks(result, cascadedTasks, stationaryRanges);
+                        }
+
+                        return result;
+                      });
                     }
                   }
-                  resizeOrigEndRef.current = null;
+                  resizeOrigEndRef.current  = null;
+                  preResizeTasksRef.current = null;
                 }
+
                 setAnimatingTask({ id: taskId, type: 'bounce-h' });
                 setTimeout(() => setAnimatingTask(null), 300);
               }}
@@ -1005,7 +1112,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           )}
 
           <div
-            className={`flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
+            className={`relative z-20 bg-sidebar flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
             style={budgetCollapsed ? {} : { height: `calc(${100 - splitPct}% - 6px)` }}
           >
           <ResourceGrid
@@ -1013,7 +1120,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               viewMode={viewMode}
               showGrid={showGrid}
               hideWeekends={hideWeekends}
-              showGrid={showGrid}
               ganttScrollRef={ganttScrollRef}
               resourceHours={resourceHours}
               onHoursChange={handleResourceHoursChange}

@@ -5,7 +5,7 @@ import { formatDate, addDays, diffDays, isWeekend, getDateRange, getMonday } fro
 import { COL_WIDTHS } from './GanttChart';
 
 const ROLE_COL_WIDTH = 280;
-const ROW_H = 28;
+const ROW_H = 34;
 
 // Input that manages local state and only propagates on blur
 function LocalInput({ value, onChange, ...props }) {
@@ -197,6 +197,9 @@ export default memo(function ResourceGrid({
     return map;
   }, [resourceHours, oopExpenses, tasks, hiddenSet, roleRates]);
 
+  const [addDept, setAddDept] = useState('');
+  const [addRole, setAddRole] = useState('');
+
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const breakdownRef = useRef(null);
 
@@ -292,7 +295,7 @@ export default memo(function ResourceGrid({
   );
 
   return (
-    <div ref={wrapperRef} className="flex flex-col h-full border-t border-border bg-sidebar relative z-10">
+    <div ref={wrapperRef} className="flex flex-col h-full border-t border-border bg-sidebar">
       {/* Collapse bar */}
       <div className="flex w-full items-center gap-2 px-4 py-2 shrink-0 relative">
         <button
@@ -431,7 +434,7 @@ export default memo(function ResourceGrid({
                 {weekSpans.map((w) => (
                   <div
                     key={w.label + w.startIdx}
-                    className={`shrink-0 flex items-center justify-center relative ${w.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                    className={`shrink-0 flex items-center justify-center relative ${w.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: w.width, height: ROW_H }}
                   >
                     {!w.isWeekend && (
@@ -445,7 +448,7 @@ export default memo(function ResourceGrid({
               </div>
 
               {/* Day header row — sticky top (below week row) */}
-              <div className="flex sticky top-[28px] z-20 border-b border-border bg-sidebar" style={{ height: ROW_H }}>
+              <div className="flex sticky top-[34px] z-20 border-b border-border bg-sidebar" style={{ height: ROW_H }}>
                 <div
                   className="sticky left-0 z-30 shrink-0 flex items-center px-3 border-r border-border bg-sidebar"
                   style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
@@ -458,11 +461,10 @@ export default memo(function ResourceGrid({
                     onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
                     className={`shrink-0 flex flex-col items-center justify-center text-center cursor-pointer
                       hover:bg-accent/15 transition-colors select-none
-                      ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{
                       width: colWidth, height: ROW_H,
                       borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
-                      borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
                     }}
                   >
                     <span className={`text-[9px] leading-none ${isColActive(d) ? 'text-accent font-bold' : 'text-text'}`}>{d.day}</span>
@@ -488,11 +490,10 @@ export default memo(function ResourceGrid({
                         <div
                           key={d.str}
                           className={`shrink-0
-                            ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                            ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                           style={{
                             width: colWidth, height: ROW_H,
                             borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
-                            borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
                             borderBottom: '1px solid var(--color-border)',
                           }}
                         />
@@ -506,8 +507,8 @@ export default memo(function ResourceGrid({
                       const personName = (roleNames || {})[entry.role] || '';
                       return (
                         <div key={entry.role} className="flex group/role" style={{ height: ROW_H }}>
-                          <RoleCell className="group-hover/role:bg-bg-alt/50 transition-colors">
-                            <div className="flex items-center px-2 h-full gap-1">
+                          <RoleCell>
+                            <div className="flex items-center px-3 h-full gap-1">
                               <button
                                 onClick={() => onHideRole(entry.role)}
                                 className="shrink-0 opacity-0 group-hover/role:opacity-100 rounded p-0 text-text-muted/40 hover:text-red-500 transition"
@@ -582,12 +583,11 @@ export default memo(function ResourceGrid({
                               <div
                                 key={d.str}
                                 className={`shrink-0 ${rowBorder} flex items-center justify-center
-                                  ${orphaned ? 'bg-red-500/10' : isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'group-hover/role:bg-bg-alt/30'}`}
+                                  ${orphaned ? 'bg-red-500/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                                 style={{
                                   width: colWidth, height: ROW_H,
                                   borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
-                                  borderLeft: showGrid && d.abbr === 'Mon' ? '1px solid var(--color-grid)' : undefined,
-                                }}
+                                      }}
                                 title={orphaned ? 'No activity on this date' : undefined}
                               >
                                 <input
@@ -612,11 +612,11 @@ export default memo(function ResourceGrid({
                 );
               })}
 
-              {/* Add role back button */}
+              {/* Add Role — only shown when roles are hidden */}
               {hiddenSet.size > 0 && (
                 <div className="flex border-b border-border/50" style={{ height: ROW_H }}>
                   <div
-                    className={`${stickyLeft} shrink-0 border-r border-border bg-sidebar`}
+                    className="sticky left-0 z-[200] shrink-0 border-r border-border bg-sidebar"
                     style={{ width: ROLE_COL_WIDTH, height: ROW_H }}
                     ref={addRoleRef}
                   >
@@ -624,26 +624,61 @@ export default memo(function ResourceGrid({
                       className="flex items-center px-3 h-full hover:bg-bg-alt/50 cursor-pointer transition"
                       onClick={() => setAddRoleOpen((o) => !o)}
                     >
-                      <Plus size={11} className="text-accent mr-1" />
+                      <Plus size={11} className="text-accent mr-1.5" />
                       <span className="text-[10px] font-semibold text-accent">
                         Add Role ({hiddenSet.size} hidden)
                       </span>
                     </div>
                     {addRoleOpen && (
-                      <div className="absolute left-0 top-full z-50 w-[340px] max-h-[240px] overflow-auto rounded-lg border border-border bg-sidebar shadow-xl">
-                        {RATE_CARD.filter((e) => hiddenSet.has(e.role)).map((entry) => (
+                      <div
+                        className="fixed w-[280px] rounded-xl border border-border bg-sidebar shadow-2xl overflow-hidden"
+                        style={{
+                          zIndex: 9999,
+                          bottom: addRoleRef.current ? window.innerHeight - addRoleRef.current.getBoundingClientRect().top + 4 : 'auto',
+                          left: addRoleRef.current ? addRoleRef.current.getBoundingClientRect().left : 0,
+                        }}
+                      >
+                        <div className="p-3 space-y-2">
+                          <div>
+                            <label className="block text-[10px] font-medium text-text-muted mb-1">Department</label>
+                            <select
+                              value={addDept}
+                              onChange={(e) => { setAddDept(e.target.value); setAddRole(''); }}
+                              className="w-full rounded-lg border border-border bg-bg-alt px-2.5 py-1.5 text-[11px] text-text focus:border-accent focus:outline-none"
+                            >
+                              <option value="">Select…</option>
+                              {departments.filter((d) => RATE_CARD.some((e) => e.department === d && hiddenSet.has(e.role))).map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-text-muted mb-1">Role</label>
+                            <select
+                              value={addRole}
+                              onChange={(e) => setAddRole(e.target.value)}
+                              disabled={!addDept}
+                              className="w-full rounded-lg border border-border bg-bg-alt px-2.5 py-1.5 text-[11px] text-text focus:border-accent focus:outline-none disabled:opacity-40"
+                            >
+                              <option value="">Select…</option>
+                              {RATE_CARD.filter((e) => e.department === addDept && hiddenSet.has(e.role)).map((e) => (
+                                <option key={e.role} value={e.role}>{e.role}</option>
+                              ))}
+                            </select>
+                          </div>
                           <button
-                            key={entry.role}
-                            onClick={() => { onShowRole(entry.role); if (hiddenSet.size <= 1) setAddRoleOpen(false); }}
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-bg-alt transition border-b border-border/30 last:border-0"
+                            disabled={!addRole}
+                            onClick={() => {
+                              if (!addRole) return;
+                              onShowRole(addRole);
+                              setAddRole('');
+                              if (hiddenSet.size <= 1) { setAddRoleOpen(false); setAddDept(''); }
+                            }}
+                            className="w-full rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-40 transition"
                           >
-                            <div>
-                              <span className="text-[11px] text-text">{entry.role}</span>
-                              <span className="text-[10px] text-text-muted ml-2">{entry.department}</span>
-                            </div>
-                            <span className="text-[10px] text-text-muted font-mono">${entry.rate}/hr</span>
+                            + Add Role
                           </button>
-                        ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -671,7 +706,7 @@ export default memo(function ResourceGrid({
                   <div
                     key={d.str}
                     className={`shrink-0 border-r border-border/20 bg-bg-alt/60
-                      ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
                     style={{ width: colWidth, height: ROW_H }}
                   />
                 ))}
@@ -711,7 +746,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/20
-                        ${isColActive(d) ? 'bg-accent/5' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
@@ -754,7 +789,7 @@ export default memo(function ResourceGrid({
                       <div
                         key={d.str}
                         className={`shrink-0 border-r border-border/30 flex items-center justify-center
-                          ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                          ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                         style={{ width: colWidth, height: ROW_H }}
                       >
                         <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-text' : 'text-text-muted/30'}`}>
@@ -769,7 +804,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/30
-                        ${isColActive(d) ? 'bg-accent/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : ''}`}
+                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
