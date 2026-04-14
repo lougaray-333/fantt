@@ -683,7 +683,7 @@ export default memo(function ResourceGrid({
                     )}
                   </div>
                   {dates.map((d) => (
-                    <div key={d.str} className="shrink-0 border-r border-border/20" style={{ width: colWidth, height: ROW_H }} />
+                    <div key={d.str} className={`shrink-0 border-r border-border/20 ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`} style={{ width: colWidth, height: ROW_H }} />
                   ))}
                 </div>
               )}
