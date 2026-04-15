@@ -1116,7 +1116,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           )}
 
           <div
-            className={`relative z-[100] bg-sidebar flex flex-col min-h-0 ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
+            className={`relative z-20 bg-sidebar flex flex-col min-h-0 overflow-hidden ${budgetCollapsed ? 'shrink-0' : 'shrink-0'}`}
             style={budgetCollapsed
               ? { background: 'var(--color-sidebar)' }
               : { height: `calc(${100 - splitPct}% - 6px)`, background: 'var(--color-sidebar)' }}
