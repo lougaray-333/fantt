@@ -50,9 +50,17 @@ function shiftHoursForMovedTasks(resourceHours, movedTasks, stationaryRanges) {
       : -businessDaysBetween(dest, refDate);
     if (bizDelta === 0) continue;
 
-    let cur = new Date(origStart + 'T00:00:00');
-    const endDate = new Date(origEnd + 'T00:00:00');
-    while (cur <= endDate) {
+    // Only shift dates in the OVERLAP between original and new task range.
+    // Dates only in the original range (gap days left behind by the move) stay in
+    // place — their hours become orphaned and show as red in the resource grid.
+    const origStartDate = new Date(origStart + 'T00:00:00');
+    const origEndDate   = new Date(origEnd   + 'T00:00:00');
+    const shiftStart = calDelta > 0 ? addDays(origStartDate, calDelta) : origStartDate;
+    const shiftEnd   = calDelta > 0 ? origEndDate : addDays(origEndDate, calDelta);
+    if (shiftStart > shiftEnd) continue; // moved more than task duration — all gap
+
+    let cur = new Date(shiftStart);
+    while (cur <= shiftEnd) {
       const dateStr = formatDate(cur);
       if (!stationaryDates.has(dateStr) && !dateShiftMap.has(dateStr)) {
         dateShiftMap.set(dateStr, bizDelta);

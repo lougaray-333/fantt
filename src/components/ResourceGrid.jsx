@@ -239,16 +239,7 @@ export default memo(function ResourceGrid({
     return () => el.removeEventListener('wheel', handler);
   }, [ganttScrollRef]);
 
-  // Sync frozen bottom rows horizontally with main grid
   const bottomScrollRef = useRef(null);
-  useEffect(() => {
-    const grid = resourceScrollRef?.current;
-    const bottom = bottomScrollRef.current;
-    if (!grid || !bottom) return;
-    const handler = () => { bottom.scrollLeft = grid.scrollLeft; };
-    grid.addEventListener('scroll', handler, { passive: true });
-    return () => grid.removeEventListener('scroll', handler);
-  }, [resourceScrollRef]);
 
   const handleInputChange = useCallback(
     (role, dateStr, value) => {
@@ -782,21 +773,14 @@ export default memo(function ResourceGrid({
             <div ref={bottomScrollRef} className="flex-1 overflow-hidden">
               <div style={{ width: gridWidth, minWidth: '100%' }}>
                 <div className="flex border-b border-border/50 bg-sidebar" style={{ height: ROW_H }}>
-                  {dates.map((d) => {
-                    const dayHours = totals.hoursPerDay[d.str] || 0;
-                    return (
-                      <div
-                        key={d.str}
-                        className={`shrink-0 border-r border-border/30 flex items-center justify-center
-                          ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
-                        style={{ width: colWidth, height: ROW_H }}
-                      >
-                        <span className={`text-[10px] font-bold font-mono ${dayHours > 0 ? 'text-text' : 'text-text-muted/30'}`}>
-                          {dayHours > 0 ? dayHours : ''}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {dates.map((d) => (
+                    <div
+                      key={d.str}
+                      className={`shrink-0 border-r border-border/30
+                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                      style={{ width: colWidth, height: ROW_H }}
+                    />
+                  ))}
                 </div>
                 <div className="flex bg-sidebar" style={{ height: ROW_H }}>
                   {dates.map((d) => (
