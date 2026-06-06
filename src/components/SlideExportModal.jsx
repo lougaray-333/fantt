@@ -15,26 +15,28 @@ const THEMES = {
   dark: {
     bg:      '#0A0A0A',
     surface: '#0F0F0F',
-    border:  'rgba(255,255,255,0.06)',
+    border:  'rgba(255,255,255,0.08)',
     textHi:  '#FFFFFF',
-    textMid: 'rgba(255,255,255,0.45)',
-    textLo:  'rgba(255,255,255,0.16)',
-    grid:    'rgba(255,255,255,0.06)',
-    track:   'rgba(229,34,34,0.18)',
+    textMid: '#E8E8E8',           // near-white — passes WCAG AA
+    textLo:  'rgba(255,255,255,0.50)',
+    grid:    'rgba(255,255,255,0.07)',
+    gridMaj: 'rgba(255,255,255,0.14)',
+    track:   'rgba(229,34,34,0.20)',
     fill:    RED,
-    today:   'rgba(255,255,255,0.35)',
+    today:   'rgba(255,255,255,0.5)',
   },
   light: {
     bg:      '#F8F8F7',
-    surface: '#EFEFED',
-    border:  'rgba(0,0,0,0.08)',
+    surface: '#ECECEA',
+    border:  'rgba(0,0,0,0.10)',
     textHi:  '#0A0A0A',
-    textMid: 'rgba(0,0,0,0.45)',
-    textLo:  'rgba(0,0,0,0.18)',
+    textMid: '#1C1C1C',           // near-black — passes WCAG AA
+    textLo:  'rgba(0,0,0,0.48)',
     grid:    'rgba(0,0,0,0.07)',
-    track:   'rgba(229,34,34,0.12)',
+    gridMaj: 'rgba(0,0,0,0.15)',
+    track:   'rgba(229,34,34,0.14)',
     fill:    RED,
-    today:   'rgba(0,0,0,0.25)',
+    today:   'rgba(0,0,0,0.4)',
   },
 };
 
@@ -56,37 +58,59 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
       .sort((a, b) => a.start.localeCompare(b.start)),
   [slideTasks, allGroups]);
 
-  const { rangeStart, totalMs, months, dateLabel, todayMs } = useMemo(() => {
-    if (!rows.length) return { rangeStart: new Date(), totalMs: 86400000, months: [], dateLabel: '', todayMs: null };
+  const { rangeStart, totalMs, weeks, dateLabel, todayMs } = useMemo(() => {
+    if (!rows.length) return { rangeStart: new Date(), totalMs: 86400000, weeks: [], dateLabel: '', todayMs: null };
+
     const rs = new Date(Math.min(...rows.map(r => new Date(r.start + 'T00:00:00'))));
     const re = new Date(Math.max(...rows.map(r => new Date(r.end   + 'T00:00:00'))));
     re.setDate(re.getDate() + 1);
     if (re <= rs) re.setMonth(re.getMonth() + 1);
     const tms = re - rs;
-    const months = [];
-    const cur = new Date(rs.getFullYear(), rs.getMonth(), 1);
-    while (cur <= re) { months.push(new Date(cur)); cur.setMonth(cur.getMonth() + 1); }
+
+    // Snap to Monday of the week containing rangeStart
+    const weekAnchor = new Date(rs);
+    const dow = weekAnchor.getDay();
+    weekAnchor.setDate(weekAnchor.getDate() - (dow === 0 ? 6 : dow - 1));
+
+    // Build week ticks
+    const weeks = [];
+    const cur = new Date(weekAnchor);
+    while (cur <= re) {
+      weeks.push(new Date(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+
+    // Adaptive label frequency: show label every N weeks to avoid crowding
+    const pxPerWeek = CHART_W / weeks.length;
+    const labelEvery = pxPerWeek < 56 ? 4 : pxPerWeek < 100 ? 2 : 1;
+
+    // Annotate which weeks get a label
+    weeks.forEach((w, i) => {
+      w._label = i % labelEvery === 0;
+      w._major = w.getDate() <= 7; // first week of a month → major grid line
+    });
+
     const fmt = d => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     const tm = new Date() - rs;
     return {
-      rangeStart: rs, totalMs: tms, months,
+      rangeStart: rs, totalMs: tms, weeks,
       dateLabel: `${fmt(new Date(rows[0].start + 'T00:00:00'))} – ${fmt(new Date(rows[rows.length-1].end + 'T00:00:00'))}`,
       todayMs: (tm > 0 && tm < tms) ? tm : null,
     };
   }, [rows]);
 
-  const ACCENT_H  = 10;
-  const TITLE_END = ACCENT_H + 154;
-  const FOOTER_H  = 52;
-  const HEADER_H  = 44;
+  const ACCENT_H   = 10;
+  const TITLE_END  = ACCENT_H + 154;
+  const FOOTER_H   = 52;
+  const HEADER_H   = 48;
   const AVAIL_ROWS = SLIDE_H - TITLE_END - FOOTER_H - HEADER_H;
-  const ROW_H     = Math.min(160, Math.max(72, Math.floor(AVAIL_ROWS / Math.max(rows.length, 1))));
-  const BAR_H     = Math.round(ROW_H * 0.52);
-  const BLOCK_H   = HEADER_H + rows.length * ROW_H;
-  const AVAIL     = SLIDE_H - TITLE_END - FOOTER_H;
-  const CHART_TOP = TITLE_END + Math.max(20, (AVAIL - BLOCK_H) / 2);
-  const BODY_Y    = CHART_TOP + HEADER_H;
-  const br        = BAR_H / 2;
+  const ROW_H      = Math.min(160, Math.max(72, Math.floor(AVAIL_ROWS / Math.max(rows.length, 1))));
+  const BAR_H      = Math.round(ROW_H * 0.52);
+  const BLOCK_H    = HEADER_H + rows.length * ROW_H;
+  const AVAIL      = SLIDE_H - TITLE_END - FOOTER_H;
+  const CHART_TOP  = TITLE_END + Math.max(20, (AVAIL - BLOCK_H) / 2);
+  const BODY_Y     = CHART_TOP + HEADER_H;
+  const br         = BAR_H / 2;
 
   const xOf   = ms => CHART_X + (ms / totalMs) * CHART_W;
   const xDate = s  => xOf(new Date(s + 'T00:00:00') - rangeStart);
@@ -174,41 +198,41 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
               {/* Date range */}
               <text x={SLIDE_W - PAD_X} y={ACCENT_H + 87}
                 dominantBaseline="middle" textAnchor="end"
-                fontSize={22} fill={T.textMid} fontFamily={FONT}>
+                fontSize={22} fill={T.textLo} fontFamily={FONT}>
                 {dateLabel}
               </text>
 
               {/* Title divider */}
               <line x1={0} y1={TITLE_END} x2={SLIDE_W} y2={TITLE_END} stroke={T.border} strokeWidth={1} />
 
-              {/* Month grid lines */}
-              {months.map((m, i) => {
-                const x = xObj(m);
-                if (x < CHART_X) return null;
-                return <line key={i} x1={x} y1={CHART_TOP} x2={x} y2={BODY_Y + rows.length * ROW_H}
-                  stroke={T.grid} strokeWidth={1} />;
-              })}
-
-              {/* Month labels */}
-              {months.map((m, i) => {
-                const x = xObj(m);
-                if (x < CHART_X) return null;
-                const label = m.getMonth() === 0
-                  ? m.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                  : m.toLocaleDateString('en-US', { month: 'short' });
+              {/* Week grid lines + labels */}
+              {weeks.map((w, i) => {
+                const x = xObj(w);
+                if (x < CHART_X - 1) return null;
+                const isMajor = w._major;
                 return (
-                  <text key={i} x={x + 14} y={CHART_TOP + HEADER_H / 2}
-                    dominantBaseline="middle" fontSize={13} fontWeight={700}
-                    fill={T.textLo} fontFamily={FONT} letterSpacing="1.5">
-                    {label.toUpperCase()}
-                  </text>
+                  <g key={i}>
+                    <line x1={x} y1={CHART_TOP} x2={x} y2={BODY_Y + rows.length * ROW_H}
+                      stroke={isMajor ? T.gridMaj : T.grid}
+                      strokeWidth={isMajor ? 1 : 0.5} />
+                    {w._label && (
+                      <text x={x + 10} y={CHART_TOP + HEADER_H / 2}
+                        dominantBaseline="middle" fontSize={13} fontWeight={600}
+                        fill={T.textLo} fontFamily={FONT}>
+                        {w.toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric',
+                          ...(isMajor && w.getMonth() === 0 ? { year: '2-digit' } : {}),
+                        })}
+                      </text>
+                    )}
+                  </g>
                 );
               })}
 
               {/* Today marker */}
               {todayMs && (
                 <line x1={xOf(todayMs)} y1={CHART_TOP} x2={xOf(todayMs)} y2={BODY_Y + rows.length * ROW_H}
-                  stroke={T.today} strokeWidth={1} strokeDasharray="4 4" />
+                  stroke={T.today} strokeWidth={2} strokeDasharray="5 4" />
               )}
 
               {/* Task rows */}
@@ -256,7 +280,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
               {/* Footer */}
               <text x={SLIDE_W - PAD_X} y={SLIDE_H - FOOTER_H / 2}
                 dominantBaseline="middle" textAnchor="end"
-                fontSize={12} fill={T.textLo} fontFamily={FONT} letterSpacing="0.5">
+                fontSize={13} fill={T.textLo} fontFamily={FONT}>
                 fantt.vercel.app
               </text>
             </svg>
