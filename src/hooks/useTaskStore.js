@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { addDays, formatDate, businessDaysBetween, businessToCalendarDays, snapToMonday } from '../utils/dates';
+import { addDays, formatDate, businessDaysBetween, businessToCalendarDays, snapToMonday, isNonWorkday } from '../utils/dates';
 import { supabase, isConfigured } from '../lib/supabase';
 
 const STORAGE_KEY = 'gantt-v2-tasks';
@@ -33,6 +33,7 @@ function rowToTask(row) {
     color: row.color || '',
     sortOrder: row.sort_order ?? 0,
     assignees: row.assignees || [],
+    inSlide: row.in_slide || false,
     milestone: row.start_date === row.end_date,
   };
 }
@@ -51,6 +52,7 @@ function taskToRow(task, projectId) {
     color: task.color || '',
     sort_order: task.sortOrder ?? 0,
     assignees: task.assignees || [],
+    in_slide: task.inSlide || false,
   };
 }
 
@@ -75,7 +77,7 @@ function diffFields(oldTask, updates) {
   return Object.keys(result).length > 0 ? result : null;
 }
 
-export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
+export function useTaskStore(projectId, { onRemoteChange, identity, holidays = [] } = {}) {
   const [tasks, setTasks] = useState(() => isConfigured ? [] : loadLocalTasks());
   const [loading, setLoading] = useState(isConfigured);
   const [saveStatus, setSaveStatus] = useState('idle');
@@ -92,6 +94,8 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
   useEffect(() => { onRemoteChangeRef.current = onRemoteChange; }, [onRemoteChange]);
   const tasksRef = useRef([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  const holidaysRef = useRef(holidays);
+  useEffect(() => { holidaysRef.current = holidays; }, [holidays]);
 
   const markSaving = useCallback(() => {
     const now = Date.now();
@@ -210,10 +214,25 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       .then(() => {});
   }, [projectId]);
 
-  const addTask = useCallback((task) => {
+  const addTask = useCallback((task, insertAfterId = null) => {
     const id = crypto.randomUUID();
-    const sortOrder = taskCountRef.current;
-    taskCountRef.current += 1;
+
+    let newSortOrder;
+    let tasksToShift = [];
+
+    if (insertAfterId) {
+      const pivot = tasksRef.current.find(t => t.id === insertAfterId);
+      if (pivot) {
+        newSortOrder = pivot.sortOrder + 1;
+        tasksToShift = tasksRef.current.filter(t => t.sortOrder >= newSortOrder);
+      }
+    }
+
+    if (newSortOrder === undefined) {
+      newSortOrder = taskCountRef.current;
+      taskCountRef.current += 1;
+    }
+
     const newTask = {
       id,
       name: task.name,
@@ -223,15 +242,24 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       progress: task.progress || 0,
       dependencies: task.dependencies || [],
       color: task.color || '',
-      sortOrder,
+      sortOrder: newSortOrder,
       assignees: task.assignees || [],
       milestone: task.milestone || false,
     };
 
-    setTasks((prev) => [...prev, newTask]);
+    const shiftThreshold = tasksToShift.length > 0 ? newSortOrder : null;
+    setTasks((prev) => {
+      const shifted = prev.map(t => shiftThreshold !== null && t.sortOrder >= shiftThreshold ? { ...t, sortOrder: t.sortOrder + 1 } : t);
+      return [...shifted, newTask].sort((a, b) => a.sortOrder - b.sortOrder);
+    });
 
     if (isConfigured) {
       recentlyWrittenRef.current.set(id, Date.now());
+      if (tasksToShift.length > 0) {
+        tasksToShift.forEach(t => {
+          supabase.from('tasks').update({ sort_order: t.sortOrder + 1 }).eq('id', t.id).then(() => {});
+        });
+      }
       supabase
         .from('tasks')
         .insert(taskToRow(newTask, projectId))
@@ -262,6 +290,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
       if (updates.color !== undefined) row.color = updates.color;
       if (updates.sortOrder !== undefined) row.sort_order = updates.sortOrder;
       if (updates.assignees !== undefined) row.assignees = updates.assignees;
+      if (updates.inSlide !== undefined) row.in_slide = updates.inSlide;
 
       if (Object.keys(row).length > 0) {
         recentlyWrittenRef.current.set(id, Date.now());
@@ -299,22 +328,24 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
 
     const dependents = getDependents(taskId, snapshot);
     const affectedIds = new Set([taskId, ...dependents]);
+    const hols = holidaysRef.current;
 
     // Helper: given a task's original dates, compute new start/end preserving biz duration
     const recompute = (origStart, origEnd, newStart) => {
-      const snapped = snapToMonday(newStart);
+      const snapped = snapToMonday(newStart, hols);
       const bizDuration = businessDaysBetween(
         new Date(origStart + 'T00:00:00'),
-        addDays(new Date(origEnd + 'T00:00:00'), 1)
+        addDays(new Date(origEnd + 'T00:00:00'), 1),
+        hols
       );
-      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1) : 0;
+      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1, hols) : 0;
       return { start: formatDate(snapped), end: formatDate(addDays(snapped, calOffset)) };
     };
 
-    // Next business day after a given end date string
+    // Next workday after a given end date string
     const nextBizDay = (endDateStr) => {
       const d = addDays(new Date(endDateStr + 'T00:00:00'), 1);
-      return snapToMonday(d);
+      return snapToMonday(d, hols);
     };
 
     // Build updated map — start with snapshot, update primary task first
@@ -403,20 +434,22 @@ export function useTaskStore(projectId, { onRemoteChange, identity } = {}) {
 
     const dependents = getDependents(taskId, snapshot);
     const affectedIds = new Set([taskId, ...dependents]);
+    const hols = holidaysRef.current;
 
     const recompute = (origStart, origEnd, newStart) => {
-      const snapped = snapToMonday(newStart);
+      const snapped = snapToMonday(newStart, hols);
       const bizDuration = businessDaysBetween(
         new Date(origStart + 'T00:00:00'),
-        addDays(new Date(origEnd + 'T00:00:00'), 1)
+        addDays(new Date(origEnd + 'T00:00:00'), 1),
+        hols
       );
-      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1) : 0;
+      const calOffset = bizDuration > 1 ? businessToCalendarDays(snapped, bizDuration - 1, hols) : 0;
       return { start: formatDate(snapped), end: formatDate(addDays(snapped, calOffset)) };
     };
 
     const nextBizDay = (endDateStr) => {
       const d = addDays(new Date(endDateStr + 'T00:00:00'), 1);
-      return snapToMonday(d);
+      return snapToMonday(d, hols);
     };
 
     const updatedMap = new Map(snapshot.map((t) => [t.id, t]));

@@ -26,11 +26,16 @@ const FONT = "'Helvetica Neue', Arial, sans-serif";
 
 export default function SlideExportModal({ tasks, projectName, onClose }) {
   const svgRef = useRef(null);
-  const allGroups = useMemo(() => getAllGroups(tasks), [tasks]);
+  const slideTasks = useMemo(() => {
+    const marked = tasks.filter(t => t.inSlide);
+    return marked.length > 0 ? marked : tasks;
+  }, [tasks]);
+
+  const allGroups = useMemo(() => getAllGroups(slideTasks), [slideTasks]);
 
   const epics = useMemo(() => {
     const map = new Map();
-    tasks.forEach(t => {
+    slideTasks.forEach(t => {
       const key = t.group || '__other__';
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(t);
@@ -44,7 +49,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
         return { label: key === '__other__' ? 'Other' : key, start: starts[0], end: ends[ends.length - 1], progress: avg, color };
       })
       .sort((a, b) => a.start.localeCompare(b.start));
-  }, [tasks, allGroups]);
+  }, [slideTasks, allGroups]);
 
   const { rangeStart, totalMs, months, dateLabel } = useMemo(() => {
     if (!epics.length) return { rangeStart: new Date(), totalMs: 86400000, months: [], dateLabel: '' };
@@ -105,7 +110,9 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="text-sm font-bold text-text">Slide Preview</h2>
-            <p className="text-xs text-text-muted mt-0.5">{epics.length} phase{epics.length !== 1 ? 's' : ''} · 1920×1080 PNG</p>
+            <p className="text-xs text-text-muted mt-0.5">
+              {slideTasks.length < tasks.length ? `${slideTasks.length} of ${tasks.length} tasks starred` : 'All tasks (star tasks to filter)'} · 1920×1080 PNG
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-text-muted hover:bg-bg-alt transition">
             <X size={18} />

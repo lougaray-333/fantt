@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Grid3x3, Share2, History } from 'lucide-react';
+import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Grid3x3, Share2, History, CalendarDays } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
-import { formatDate, addDays, isWeekend, businessDaysBetween, businessToCalendarDays, diffDays, getDateRange, getMonday } from '../utils/dates';
+import { formatDate, addDays, isWeekend, isNonWorkday, businessDaysBetween, businessToCalendarDays, diffDays, getDateRange, getMonday } from '../utils/dates';
 import GanttChart, { COL_WIDTHS } from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
@@ -13,6 +13,7 @@ const ActivityLibrary = lazy(() => import('./ActivityLibrary'));
 const BugReportButton = lazy(() => import('./BugReportButton'));
 import ResourceGrid from './ResourceGrid';
 import SharePanel from './SharePanel';
+import HolidayPanel from './HolidayPanel';
 import { useHistory } from '../hooks/useHistory';
 import { usePresence } from '../hooks/usePresence';
 import { supabase, isConfigured } from '../lib/supabase';
@@ -93,9 +94,12 @@ function shiftHoursForMovedTasks(resourceHours, movedTasks, stationaryRanges) {
 
 export default function GanttEditor({ projectId, projectName, email, onBack, isCollaborator = false }) {
   const history = useHistory();
+  const [holidays, setHolidays] = useState([]);
+  const [showHolidayPanel, setShowHolidayPanel] = useState(false);
   const store = useTaskStore(projectId, {
     identity: email || 'Collaborator',
     onRemoteChange: () => history.clear(),
+    holidays,
   });
   const { theme, toggleTheme } = useTheme();
   const { others } = usePresence(projectId, email || 'Collaborator');
@@ -103,6 +107,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
+  const [insertAfterId, setInsertAfterId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -218,6 +223,26 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         budgetReadyToSaveRef.current = true;
       });
   }, [projectId]);
+
+  // Load holidays from Supabase on project open
+  useEffect(() => {
+    if (!isConfigured || !projectId) return;
+    supabase
+      .from('projects')
+      .select('holidays')
+      .eq('id', projectId)
+      .single()
+      .then(({ data }) => {
+        if (data?.holidays) setHolidays(data.holidays);
+      });
+  }, [projectId]);
+
+  async function handleSaveHolidays(updated) {
+    setHolidays(updated);
+    if (isConfigured && projectId) {
+      await supabase.from('projects').update({ holidays: updated }).eq('id', projectId);
+    }
+  }
 
   // Auto-save budget data to localStorage + Supabase (debounced).
   // IMPORTANT: read from stateRef.current inside the callback, NOT from the closed-over
@@ -414,7 +439,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     let cursor = new Date(min);
     while (cursor <= max) {
       const dateStr = formatDate(cursor);
-      newRoleData[dateStr] = isWeekend(cursor) ? 0 : hoursPerDay;
+      newRoleData[dateStr] = isNonWorkday(cursor, holidays) ? 0 : hoursPerDay;
       cursor = addDays(cursor, 1);
     }
     setResourceHours((prev) => ({ ...prev, [role]: newRoleData }));
@@ -468,6 +493,20 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       setEditingId(id);
       setFormOpen(true);
     }
+  }, []);
+
+  const handleRowSelect = useCallback((id) => {
+    setSelectedIds(new Set([id]));
+    setEditingId(null);
+    setFormOpen(false);
+    setFormClosing(false);
+  }, []);
+
+  const handleRowEdit = useCallback((id) => {
+    snap();
+    setSelectedIds(new Set([id]));
+    setEditingId(id);
+    setFormOpen(true);
   }, []);
 
   const handleLoadPreset = () => {
@@ -555,7 +594,8 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
       store.updateTask(editingTask.id, formData);
     } else {
       snap();
-      const task = store.addTask(formData);
+      const task = store.addTask(formData, insertAfterId);
+      setInsertAfterId(null);
       setSelectedIds(new Set([task.id]));
       setAnimatingTask({ id: task.id, type: 'pop-in' });
       setTimeout(() => setAnimatingTask(null), 400);
@@ -589,6 +629,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   };
 
   const handleOpenAdd = () => {
+    setInsertAfterId(primarySelectedId);
     setEditingId(null);
     setFormOpen(true);
   };
@@ -650,6 +691,20 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           >
             <CalendarOff size={13} />
             Weekends
+          </button>
+
+          {/* Holidays */}
+          <button
+            onClick={() => setShowHolidayPanel(true)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              holidays.length > 0
+                ? 'bg-accent/15 text-accent'
+                : 'text-text-muted hover:bg-bg-alt'
+            }`}
+            title="Manage project holidays"
+          >
+            <CalendarDays size={13} />
+            Holidays{holidays.length > 0 ? ` (${holidays.length})` : ''}
           </button>
 
           {/* Grid toggle */}
@@ -938,14 +993,17 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               tasks={store.tasks}
               viewMode={viewMode}
               selectedIds={selectedIds}
-              onSelect={handleSelect}
+              onSelect={handleRowSelect}
+              onEdit={handleRowEdit}
               onDelete={handleDeleteTask}
+              onToggleSlide={(id, val) => store.updateTask(id, { inSlide: val })}
             />
             <GanttChart
               tasks={store.tasks}
               viewMode={viewMode}
               hideWeekends={hideWeekends}
               showGrid={showGrid}
+              holidays={holidays}
               selectedId={primarySelectedId}
               selectedIds={selectedIds}
               animatingTask={animatingTask}
@@ -1134,6 +1192,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               viewMode={viewMode}
               showGrid={showGrid}
               hideWeekends={hideWeekends}
+              holidays={holidays}
               ganttScrollRef={ganttScrollRef}
               resourceHours={resourceHours}
               onHoursChange={handleResourceHoursChange}
@@ -1194,6 +1253,15 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         </>
       )}
 
+      {/* Holiday Panel */}
+      {showHolidayPanel && (
+        <HolidayPanel
+          holidays={holidays}
+          onSave={handleSaveHolidays}
+          onClose={() => setShowHolidayPanel(false)}
+        />
+      )}
+
       {/* Slide-over TaskForm panel */}
       {formOpen && (
         <>
@@ -1226,6 +1294,11 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
                 onSubmit={handleAddOrUpdate}
                 onCancel={handleCloseForm}
                 onDelete={handleDeleteTask}
+                defaultStart={(() => {
+                  if (editingTask || !insertAfterId) return undefined;
+                  const anchor = store.tasks.find(t => t.id === insertAfterId);
+                  return anchor ? formatDate(addDays(new Date(anchor.end + 'T00:00:00'), 1)) : undefined;
+                })()}
               />
             </div>
           </div>

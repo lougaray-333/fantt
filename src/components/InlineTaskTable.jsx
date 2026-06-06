@@ -1,10 +1,10 @@
 import { memo } from 'react';
-import { Trash2, Diamond } from 'lucide-react';
+import { Trash2, Diamond, Star } from 'lucide-react';
 import { formatShortDate } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 import { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
 
-export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onDelete }) {
+export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onEdit, onDelete, onToggleSlide }) {
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
 
@@ -37,7 +37,8 @@ export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onS
           return (
             <div
               key={task.id}
-              onClick={() => onSelect(task.id, false)}
+              onClick={() => onSelect(task.id)}
+              onDoubleClick={() => onEdit?.(task.id)}
               className={`group/row flex items-center gap-2 px-3 cursor-pointer transition border-b border-border/50 ${
                 isSelected
                   ? 'bg-accent-light'
@@ -71,6 +72,20 @@ export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onS
                   </div>
                 )}
               </div>
+              {/* Slide toggle */}
+              {onToggleSlide && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleSlide(task.id, !task.inSlide); }}
+                  className={`shrink-0 rounded p-0.5 transition ${
+                    task.inSlide
+                      ? 'text-accent opacity-100'
+                      : 'text-text-muted/30 opacity-0 group-hover/row:opacity-100 hover:text-accent'
+                  }`}
+                  title={task.inSlide ? 'Remove from slide export' : 'Include in slide export'}
+                >
+                  <Star size={12} fill={task.inSlide ? 'currentColor' : 'none'} />
+                </button>
+              )}
               {/* Delete on hover */}
               {onDelete && (
                 <button
