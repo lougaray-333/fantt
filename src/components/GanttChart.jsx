@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays, snapToMonday } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays, snapToMonday, isNonWorkday } from '../utils/dates';
 import { getTaskColor, getAllGroups, getContrastColor, PRESET_HEXES } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
@@ -34,6 +34,7 @@ export default memo(function GanttChart({
   highlightedDate,
   onDateClick,
   showGrid = true,
+  holidays = [],
 }) {
   const svgRef = useRef(null);
   const internalScrollRef = useRef(null);
@@ -151,15 +152,19 @@ export default memo(function GanttChart({
       let col = 0;
       for (let i = 0; i < calendarDays; i++) {
         const d = addDays(rangeStart, i);
-        if (skipWeekends && isWeekend(d)) continue;
+        if (skipWeekends && isNonWorkday(d, holidays)) continue;
+        const dateStr = formatDate(d);
+        const holiday = holidays.find(h => h.date === dateStr);
         labels.push({
           x: col * colWidth,
           width: colWidth,
           label: d.getDate().toString(),
           sublabel: DAY_ABBRS[d.getDay()],
           isWeekend: isWeekend(d),
-          isToday: formatDate(d) === todayStr,
-          dateStr: formatDate(d),
+          isHoliday: !!holiday,
+          holidayName: holiday?.name || '',
+          isToday: dateStr === todayStr,
+          dateStr,
         });
         col++;
       }
@@ -189,7 +194,7 @@ export default memo(function GanttChart({
       }
     }
     return labels;
-  }, [rangeStart, rangeEnd, totalDays, colWidth, viewMode, todayStr, skipWeekends]);
+  }, [rangeStart, rangeEnd, totalDays, colWidth, viewMode, todayStr, skipWeekends, holidays]);
 
   // Memoized clipPath defs
   const clipPathDefs = useMemo(() => {
@@ -441,7 +446,7 @@ export default memo(function GanttChart({
                   <text x={h.x + h.width / 2} y={60} textAnchor="middle" fontSize={12} fontWeight={h.isToday || highlightedDate === h.dateStr ? 700 : 500} fill={h.isToday || highlightedDate === h.dateStr ? 'var(--color-accent)' : 'var(--color-text)'} style={{ fontFamily: 'var(--font-sans)' }}>
                     {h.label}
                   </text>
-                  <text x={h.x + h.width / 2} y={74} textAnchor="middle" fontSize={9} fill={h.isToday || highlightedDate === h.dateStr ? 'var(--color-accent)' : 'var(--color-text-muted)'} style={{ fontFamily: 'var(--font-sans)' }}>
+                  <text x={h.x + h.width / 2} y={74} textAnchor="middle" fontSize={9} fill={h.isToday || highlightedDate === h.dateStr ? 'var(--color-accent)' : h.isHoliday ? '#f59e0b' : 'var(--color-text-muted)'} title={h.holidayName} style={{ fontFamily: 'var(--font-sans)' }}>
                     {h.sublabel}
                   </text>
                   {onDateClick && h.dateStr && (
@@ -501,10 +506,13 @@ export default memo(function GanttChart({
           );
         })()}
 
-        {/* Weekend shading + vertical grid */}
+        {/* Weekend/holiday shading + vertical grid */}
         {headerLabels.map((h, i) => (
           <g key={`grid-${i}`}>
-            {h.isWeekend && (
+            {h.isHoliday && (
+              <rect x={h.x} y={0} width={h.width} height={bodyHeight} fill="var(--color-holiday)" />
+            )}
+            {!h.isHoliday && h.isWeekend && (
               <rect x={h.x} y={0} width={h.width} height={bodyHeight} fill="var(--color-weekend)" />
             )}
             {showGrid && <line x1={h.x} y1={0} x2={h.x} y2={bodyHeight} stroke="var(--color-grid)" strokeWidth={h.sublabel === 'Mon' ? 1.5 : 1} strokeOpacity={h.sublabel === 'Mon' ? 0.9 : 0.7} />}
@@ -558,16 +566,20 @@ export default memo(function GanttChart({
         {tasks.map((task, i) => {
           const x = dayToX(task.start);
           const duration = skipWeekends
-            ? businessDaysBetween(task.start, addDays(task.end, 1))
+            ? businessDaysBetween(task.start, addDays(task.end, 1), holidays)
             : diffDays(task.start, task.end) + 1;
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);
+          const progress = task.progress || 0;
+          const effectiveColor = progress === 100 ? 'var(--color-task-complete)' : color;
           // Preset and group-assigned colors are always dark enough for white text.
           // Only run contrast check for user-entered custom hex values.
-          const textColor = PRESET_HEXES.has(color) ? '#ffffff' : getContrastColor(color);
+          // Completed (grey) bars use theme text color for reliable contrast.
+          const textColor = progress === 100
+            ? 'var(--color-text)'
+            : (PRESET_HEXES.has(color) ? '#ffffff' : getContrastColor(color));
           const isSelected = selectedId === task.id;
-          const progress = task.progress || 0;
           const totalHoursPerDay = (task.assignees || []).reduce((sum, a) => sum + (a.hoursPerDay || 0), 0);
 
           // Milestone diamond geometry
@@ -665,18 +677,24 @@ export default memo(function GanttChart({
                 <rect x={x - 2} y={y - 2} width={barWidth + 4} height={BAR_HEIGHT + 4} rx={7} fill="none" stroke={color} strokeWidth={2} opacity={0.4} />
               )}
 
-              <rect x={x} y={y} width={barWidth} height={BAR_HEIGHT} rx={5} fill={color} opacity={0.85} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
+              <rect x={x} y={y} width={barWidth} height={BAR_HEIGHT} rx={5} fill={effectiveColor} opacity={0.85} stroke="rgba(255,255,255,0.12)" strokeWidth={1} />
 
               {progress > 0 && (
-                <rect x={x} y={y} width={barWidth * (progress / 100)} height={BAR_HEIGHT} rx={5} fill={color} opacity={1} style={{ pointerEvents: 'none' }} />
+                <rect x={x} y={y} width={barWidth * (progress / 100)} height={BAR_HEIGHT} rx={5} fill={effectiveColor} opacity={1} style={{ pointerEvents: 'none' }} />
               )}
 
               <text x={x + 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={500} fill={textColor} clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                 {task.name}
               </text>
 
-              {viewMode === 'day' && totalHoursPerDay > 0 && barWidth > 60 && (
-                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill={textColor} opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+              {barWidth > 30 && (
+                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill={textColor} opacity={0.75} clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+                  {progress}%
+                </text>
+              )}
+
+              {viewMode === 'day' && totalHoursPerDay > 0 && barWidth > 90 && (
+                <text x={x + barWidth - 38} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill={textColor} opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                   {totalHoursPerDay}h/d
                 </text>
               )}
