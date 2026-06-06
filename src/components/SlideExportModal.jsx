@@ -4,8 +4,8 @@ import { getTaskColor, getAllGroups } from '../utils/colors';
 
 const SLIDE_W = 1920;
 const SLIDE_H = 1080;
-const PAD_X   = 112;
-const LABEL_W = 300;
+const PAD_X   = 88;
+const LABEL_W = 280;
 const CHART_X = PAD_X + LABEL_W;
 const CHART_W = SLIDE_W - CHART_X - PAD_X;
 const RED     = '#E52222';
@@ -75,17 +75,16 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
     };
   }, [rows]);
 
-  const ACCENT_H  = 5;
-  const TITLE_END = ACCENT_H + 130;
-  const FOOTER_H  = 56;
+  const ACCENT_H  = 10;
+  const TITLE_END = ACCENT_H + 154;
+  const FOOTER_H  = 52;
   const HEADER_H  = 44;
-  const ROW_H     = Math.min(104, Math.max(56, Math.floor(
-    (SLIDE_H - TITLE_END - FOOTER_H - HEADER_H) / Math.max(rows.length, 1)
-  )));
-  const BAR_H     = Math.round(ROW_H * 0.34);
+  const AVAIL_ROWS = SLIDE_H - TITLE_END - FOOTER_H - HEADER_H;
+  const ROW_H     = Math.min(160, Math.max(72, Math.floor(AVAIL_ROWS / Math.max(rows.length, 1))));
+  const BAR_H     = Math.round(ROW_H * 0.52);
   const BLOCK_H   = HEADER_H + rows.length * ROW_H;
   const AVAIL     = SLIDE_H - TITLE_END - FOOTER_H;
-  const CHART_TOP = TITLE_END + Math.max(24, (AVAIL - BLOCK_H) / 2);
+  const CHART_TOP = TITLE_END + Math.max(20, (AVAIL - BLOCK_H) / 2);
   const BODY_Y    = CHART_TOP + HEADER_H;
   const br        = BAR_H / 2;
 
@@ -166,16 +165,16 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
               <rect width={SLIDE_W} height={ACCENT_H} fill={RED} />
 
               {/* Project name */}
-              <text x={PAD_X} y={ACCENT_H + 75}
-                dominantBaseline="middle" fontSize={46} fontWeight={800}
+              <text x={PAD_X} y={ACCENT_H + 87}
+                dominantBaseline="middle" fontSize={68} fontWeight={800}
                 fill={T.textHi} fontFamily={FONT}>
                 {projectName}
               </text>
 
               {/* Date range */}
-              <text x={SLIDE_W - PAD_X} y={ACCENT_H + 75}
+              <text x={SLIDE_W - PAD_X} y={ACCENT_H + 87}
                 dominantBaseline="middle" textAnchor="end"
-                fontSize={18} fill={T.textMid} fontFamily={FONT}>
+                fontSize={22} fill={T.textMid} fontFamily={FONT}>
                 {dateLabel}
               </text>
 
@@ -199,7 +198,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
                   : m.toLocaleDateString('en-US', { month: 'short' });
                 return (
                   <text key={i} x={x + 14} y={CHART_TOP + HEADER_H / 2}
-                    dominantBaseline="middle" fontSize={11} fontWeight={700}
+                    dominantBaseline="middle" fontSize={13} fontWeight={700}
                     fill={T.textLo} fontFamily={FONT} letterSpacing="1.5">
                     {label.toUpperCase()}
                   </text>
@@ -232,7 +231,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
                     {/* Task label */}
                     <text x={PAD_X + LABEL_W - 28} y={rowY + ROW_H / 2}
                       dominantBaseline="middle" textAnchor="end"
-                      fontSize={16} fontWeight={600} fill={T.textMid} fontFamily={FONT}>
+                      fontSize={20} fontWeight={600} fill={T.textMid} fontFamily={FONT}>
                       {row.label}
                     </text>
 
