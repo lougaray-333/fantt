@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2, Pencil, ClipboardList } from 'lucide-react';
+import { X, Link2, Copy, Check, RefreshCw, BarChart2, AlertTriangle, Loader2, Pencil, ClipboardList, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import SlideExportModal from './SlideExportModal';
 
 export default function SharePanel({ projectId, projectName, onClose, tasks = [] }) {
   const [tab, setTab] = useState('link');
@@ -16,6 +17,7 @@ export default function SharePanel({ projectId, projectName, onClose, tasks = []
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
   const [showEditRegenConfirm, setShowEditRegenConfirm] = useState(false);
   const [scheduleCopied, setScheduleCopied] = useState(false);
+  const [showSlideExport, setShowSlideExport] = useState(false);
 
   function handleCopySchedule() {
     if (tasks.length === 0) return;
@@ -163,7 +165,7 @@ export default function SharePanel({ projectId, projectName, onClose, tasks = []
 
       {/* Tabs */}
       <div className="flex border-b border-border shrink-0">
-        {['link', 'analytics'].map((t) => (
+        {['link', 'export', 'analytics'].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -173,7 +175,7 @@ export default function SharePanel({ projectId, projectName, onClose, tasks = []
                 : 'text-text-muted hover:text-text'
             }`}
           >
-            {t === 'link' ? 'Link' : 'Analytics'}
+            {t === 'link' ? 'Link' : t === 'export' ? 'Export' : 'Analytics'}
           </button>
         ))}
       </div>
@@ -388,6 +390,27 @@ export default function SharePanel({ projectId, projectName, onClose, tasks = []
           </div>
         )}
 
+        {/* ── Export tab ── */}
+        {tab === 'export' && (
+          <div className="flex flex-col gap-5">
+            <div>
+              <p className="text-sm font-semibold text-text">Keynote slide</p>
+              <p className="text-xs text-text-muted mt-0.5">One row per phase · Month view · 1920×1080 PNG</p>
+            </div>
+            <button
+              onClick={() => setShowSlideExport(true)}
+              disabled={tasks.length === 0}
+              className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download size={13} />
+              Preview &amp; download
+            </button>
+            {tasks.length === 0 && (
+              <p className="text-xs text-text-muted text-center">Add tasks to this project first.</p>
+            )}
+          </div>
+        )}
+
         {/* ── Analytics tab ── */}
         {tab === 'analytics' && (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
@@ -406,6 +429,14 @@ export default function SharePanel({ projectId, projectName, onClose, tasks = []
           Shared views are read-only and do not include budget data
         </p>
       </div>
+
+      {showSlideExport && (
+        <SlideExportModal
+          tasks={tasks}
+          projectName={projectName}
+          onClose={() => setShowSlideExport(false)}
+        />
+      )}
     </div>
   );
 }
