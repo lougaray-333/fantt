@@ -12,6 +12,7 @@ const LandingPage = lazy(() => import('./components/LandingPage'));
 const GodMode = lazy(() => import('./components/GodMode'));
 const SharedView = lazy(() => import('./components/SharedView'));
 const EditView = lazy(() => import('./components/EditView'));
+const BoxCallback = lazy(() => import('./components/BoxCallback'));
 
 const EMAIL_KEY = 'fantt-user-email';
 const STORAGE_KEY = 'gantt-v2-tasks';
@@ -100,6 +101,15 @@ export default function App() {
       // stay on dashboard
     }
   };
+
+  // Box OAuth callback — handle before anything else
+  if (window.location.pathname === '/box-callback') {
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <BoxCallback />
+      </Suspense>
+    );
+  }
 
   // Password gate — skip for public share/edit links so clients aren't blocked
   const isPublicRoute = hash.startsWith('#/share/') || hash.startsWith('#/edit/');

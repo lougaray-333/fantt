@@ -505,3 +505,58 @@ export async function downloadPDF(tasks, projectName, theme = 'dark', layout = '
   doc.save(`${projectName || 'Gantt'} - Gantt.pdf`);
 }
 
+// ─── Save to Box ───────────────────────────────────────────────────────────
+export async function saveToBox({ tasks, projectName, theme, folderId, projectId, getToken, getFileId, setFileId }) {
+  const token = await getToken();
+  if (!token) throw new Error('Not connected to Box');
+
+  const canvas = await buildGanttCanvas(tasks, projectName, theme);
+  if (!canvas) throw new Error('Failed to render canvas');
+
+  const fileName = `${projectName || 'Gantt'} - Gantt.png`;
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+  const existingFileId = getFileId(projectId);
+
+  if (existingFileId) {
+    // Upload new version of existing file
+    const form = new FormData();
+    form.append('attributes', JSON.stringify({ name: fileName }));
+    form.append('file', blob, fileName);
+
+    const res = await fetch(`https://upload.box.com/api/2.0/files/${existingFileId}/content`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { versioned: true, fileId: existingFileId, entry: data.entries?.[0] };
+    }
+    // File may have been deleted — fall through to create new
+  }
+
+  // Upload as new file
+  const targetFolder = folderId || '0';
+  const form = new FormData();
+  form.append('attributes', JSON.stringify({ name: fileName, parent: { id: targetFolder } }));
+  form.append('file', blob, fileName);
+
+  const res = await fetch('https://upload.box.com/api/2.0/files/content', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Box upload failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const newFileId = data.entries?.[0]?.id;
+  if (newFileId) setFileId(projectId, newFileId);
+
+  return { versioned: false, fileId: newFileId, entry: data.entries?.[0] };
+}
