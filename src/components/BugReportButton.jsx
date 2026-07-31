@@ -19,8 +19,13 @@ function playBugClick() {
   } catch (_) {}
 }
 
-export default function BugReportButton() {
-  const [open, setOpen] = useState(false);
+export default function BugReportButton({ externalOpen, onExternalClose }) {
+  const controlled = externalOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlled ? externalOpen : internalOpen;
+  const setOpen = controlled
+    ? (v) => { if (!v) onExternalClose?.(); }
+    : setInternalOpen;
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null); // 'in' | 'out' | null
   const [form, setForm] = useState({
@@ -69,14 +74,16 @@ export default function BugReportButton() {
 
   return (
     <>
-      {/* Floating bug button */}
-      <button
-        onClick={() => { playBugClick(); setOpen(true); }}
-        className="fixed bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-sidebar shadow-lg text-text-muted hover:text-accent hover:border-accent transition"
-        title="Report a bug"
-      >
-        <Bug size={18} />
-      </button>
+      {/* Floating bug button — only in uncontrolled mode */}
+      {!controlled && (
+        <button
+          onClick={() => { playBugClick(); setOpen(true); }}
+          className="fixed bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-sidebar shadow-lg text-text-muted hover:text-accent hover:border-accent transition"
+          title="Report a bug"
+        >
+          <Bug size={18} />
+        </button>
+      )}
 
       {/* Modal */}
       {open && (

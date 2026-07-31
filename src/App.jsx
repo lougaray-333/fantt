@@ -162,6 +162,7 @@ export default function App() {
       <Suspense fallback={null}>
         <ProjectDashboard
           projects={projectStore.projects}
+          folders={projectStore.folders}
           loading={projectStore.loading}
           canCreateMore={projectStore.canCreateMore}
           maxProjects={projectStore.maxProjects}
@@ -169,6 +170,17 @@ export default function App() {
           onOpen={setActiveProjectId}
           onDelete={projectStore.deleteProject}
           onRename={projectStore.renameProject}
+          onDuplicate={projectStore.duplicateProject}
+          onMoveToFolder={projectStore.moveProjectToFolder}
+          onToggleFavorite={projectStore.toggleFavorite}
+          onToggleTemplate={projectStore.toggleTemplate}
+          onCreateFolder={projectStore.createFolder}
+          onRenameFolder={projectStore.renameFolder}
+          onDeleteFolder={projectStore.deleteFolder}
+          onShareTemplate={projectStore.shareTemplate}
+          onUnshareTemplate={projectStore.unshareTemplate}
+          onUpdateProjectColor={projectStore.updateProjectColor}
+          onUpdateFolderColor={projectStore.updateFolderColor}
           onSignOut={handleLogout}
           onImportLocal={handleImportLocal}
           onImportWBS={handleImportWBS}

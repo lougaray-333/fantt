@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Trash2, Check, Diamond } from 'lucide-react';
-import { formatDate } from '../utils/dates';
+import { Plus, X, Trash2, Check, Diamond, Copy } from 'lucide-react';
+import { formatDate, computeAutoProgress } from '../utils/dates';
 import { PRESET_COLORS, getContrastColor } from '../utils/colors';
 
-export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDelete }) {
-  // Default start = day after the last task's end date, or today
+export default function TaskForm({ editingTask, tasks, holidays = [], onSubmit, onCancel, onDelete, onDuplicate, defaultStart: propDefaultStart }) {
+  // Default start = prop override (insert-after), else day after last task's end, else today
   const lastTask = tasks.length > 0 ? tasks[tasks.length - 1] : null;
-  const defaultStart = lastTask
+  const defaultStart = propDefaultStart || (lastTask
     ? formatDate(new Date(new Date(lastTask.end + 'T00:00:00').getTime() + 86400000))
-    : formatDate(new Date());
+    : formatDate(new Date()));
   const defaultEnd = formatDate(new Date(new Date(defaultStart + 'T00:00:00').getTime() + 7 * 86400000));
 
   const emptyForm = {
@@ -17,6 +17,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
     end: defaultEnd,
     group: '',
     progress: 0,
+    autoProgress: true,
     dependencies: [],
     color: '',
     assignees: [],
@@ -25,6 +26,7 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
 
   const [form, setForm] = useState(emptyForm);
   const [customHex, setCustomHex] = useState('');
+  const lastTaskIdRef = useRef(null);
 
   useEffect(() => {
     initialLoadRef.current = true;
@@ -36,18 +38,23 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
         end: editingTask.end,
         group: editingTask.group || '',
         progress: editingTask.progress || 0,
+        autoProgress: editingTask.autoProgress || false,
         dependencies: editingTask.dependencies || [],
         color,
         assignees: editingTask.assignees || [],
         milestone: editingTask.milestone || false,
       });
-      // If color is custom (not in presets), show it in hex input
-      if (color && !PRESET_COLORS.some((p) => p.hex === color)) {
-        setCustomHex(color);
-      } else {
-        setCustomHex('');
+      // Only reset hex input when opening a different task, not on every auto-save update
+      if (editingTask.id !== lastTaskIdRef.current) {
+        lastTaskIdRef.current = editingTask.id;
+        if (color && !PRESET_COLORS.some((p) => p.hex === color)) {
+          setCustomHex(color);
+        } else {
+          setCustomHex('');
+        }
       }
     } else {
+      lastTaskIdRef.current = null;
       setForm(emptyForm);
       setCustomHex('');
     }
@@ -208,20 +215,48 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
         </div>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-text-muted">
-          Progress ({form.progress}%)
-        </label>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={form.progress}
-          onChange={(e) => setForm({ ...form, progress: Number(e.target.value) })}
-          className="w-full accent-accent"
-        />
-      </div>
+      {!form.milestone && (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-medium text-text-muted">Progress</label>
+            <div className="flex rounded-md border border-border overflow-hidden text-[10px] font-medium">
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, autoProgress: true }))}
+                className={`px-2.5 py-0.5 transition ${form.autoProgress ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-alt'}`}
+              >
+                Auto
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, autoProgress: false }))}
+                className={`px-2.5 py-0.5 border-l border-border transition ${!form.autoProgress ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-alt'}`}
+              >
+                Manual
+              </button>
+            </div>
+          </div>
+          {form.autoProgress ? (
+            <p className="text-xs text-text-muted">
+              <span className="font-medium text-text">{computeAutoProgress(form.start, form.end, holidays)}%</span>
+              {' '}— calculated from dates
+            </p>
+          ) : (
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={form.progress}
+              onChange={(e) => setForm({ ...form, progress: Number(e.target.value) })}
+              className="w-full accent-accent"
+            />
+          )}
+          {!form.autoProgress && (
+            <p className="text-[10px] text-text-muted/60 mt-0.5">{form.progress}%</p>
+          )}
+        </div>
+      )}
 
       {/* Milestone toggle */}
       <div className="flex items-center gap-2">
@@ -342,32 +377,65 @@ export default function TaskForm({ editingTask, tasks, onSubmit, onCancel, onDel
       )}
 
       {editingTask ? (
-        showSaved ? (
-          <div className="flex items-center gap-1 pt-1 text-xs text-green-500">
-            <Check size={10} />
-            Saved
-          </div>
-        ) : null
+        <div className="flex items-center gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (!form.name.trim() || !form.start || !form.end) return;
+              onSubmit(form);
+              setShowSaved(true);
+              clearTimeout(savedTimerRef.current);
+              savedTimerRef.current = setTimeout(() => setShowSaved(false), 1500);
+            }}
+            className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              showSaved
+                ? 'border-green-500/40 bg-green-500/10 text-green-500'
+                : 'border-border text-text-muted hover:border-accent/40 hover:text-text'
+            }`}
+          >
+            <Check size={11} />
+            {showSaved ? 'Saved' : 'Save'}
+          </button>
+          {onDuplicate && (
+            <button
+              type="button"
+              onClick={() => onDuplicate(editingTask.id)}
+              className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:border-accent/40 hover:text-text transition"
+            >
+              <Copy size={11} />
+              Duplicate
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(editingTask.id)}
+              className="ml-auto flex items-center gap-1 rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10 transition"
+            >
+              <Trash2 size={11} />
+              Delete
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-col gap-1.5 pt-1">
           <button
             type="submit"
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             <Plus size={14} />
             Add Task
           </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-center text-xs text-text-muted/50 hover:text-text-muted transition py-1"
+            >
+              Cancel
+            </button>
+          )}
         </div>
-      )}
-      {editingTask && onDelete && (
-        <button
-          type="button"
-          onClick={() => onDelete(editingTask.id)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 mt-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition"
-        >
-          <Trash2 size={14} />
-          Delete Task
-        </button>
       )}
     </form>
   );

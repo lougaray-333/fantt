@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X, Eraser } from 'lucide-react';
 import { RATE_CARD, getDepartments } from '../data/rateCard';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, getMonday } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, getMonday, isNonWorkday } from '../utils/dates';
 import { COL_WIDTHS } from './GanttChart';
 
 const ROLE_COL_WIDTH = 280;
@@ -51,6 +51,7 @@ export default memo(function ResourceGrid({
   highlightedDate,
   onDateClick,
   showGrid = true,
+  holidays = [],
 }) {
   const departments = useMemo(() => getDepartments(), []);
   const hiddenSet = useMemo(() => new Set(hiddenRoles || []), [hiddenRoles]);
@@ -68,17 +69,19 @@ export default memo(function ResourceGrid({
     const arr = [];
     for (let i = 0; i < totalDays; i++) {
       const d = addDays(rangeStart, i);
-      if (skipWeekends && isWeekend(d)) continue;
+      if (skipWeekends && isNonWorkday(d, holidays)) continue;
+      const str = formatDate(d);
       arr.push({
-        str: formatDate(d),
+        str,
         day: d.getDate(),
         abbr: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()],
         isWeekend: isWeekend(d),
-        isToday: formatDate(d) === formatDate(new Date()),
+        isHoliday: holidays.some(h => h.date === str),
+        isToday: str === formatDate(new Date()),
       });
     }
     return arr;
-  }, [rangeStart, totalDays, skipWeekends]);
+  }, [rangeStart, totalDays, skipWeekends, holidays]);
 
   // Week spans — Mon–Fri only; weekends get their own unlabeled span.
   // Uses week1Monday passed from GanttEditor so labels stay in sync with Gantt.
@@ -452,7 +455,7 @@ export default memo(function ResourceGrid({
                     onClick={() => onDateClick?.(highlightedDate === d.str ? null : d.str)}
                     className={`shrink-0 flex flex-col items-center justify-center text-center cursor-pointer
                       hover:bg-accent/15 transition-colors select-none
-                      ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                      ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{
                       width: colWidth, height: ROW_H,
                       borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
@@ -481,7 +484,7 @@ export default memo(function ResourceGrid({
                         <div
                           key={d.str}
                           className={`shrink-0
-                            ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                            ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                           style={{
                             width: colWidth, height: ROW_H,
                             borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
@@ -574,7 +577,7 @@ export default memo(function ResourceGrid({
                               <div
                                 key={d.str}
                                 className={`shrink-0 ${rowBorder} flex items-center justify-center
-                                  ${orphaned ? 'bg-red-500/10' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                                  ${orphaned ? 'bg-red-500/10' : d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                                 style={{
                                   width: colWidth, height: ROW_H,
                                   borderRight: showGrid ? '1px solid var(--color-grid)' : '1px solid transparent',
@@ -674,7 +677,7 @@ export default memo(function ResourceGrid({
                     )}
                   </div>
                   {dates.map((d) => (
-                    <div key={d.str} className={`shrink-0 border-r border-border/20 ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`} style={{ width: colWidth, height: ROW_H }} />
+                    <div key={d.str} className={`shrink-0 border-r border-border/20 ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`} style={{ width: colWidth, height: ROW_H }} />
                   ))}
                 </div>
               )}
@@ -696,7 +699,7 @@ export default memo(function ResourceGrid({
                 {dates.map((d) => (
                   <div
                     key={d.str}
-                    className={`shrink-0 border-r border-border/20 ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                    className={`shrink-0 border-r border-border/20 ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                     style={{ width: colWidth, height: ROW_H }}
                   />
                 ))}
@@ -736,7 +739,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/20
-                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                        ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
@@ -777,7 +780,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/30
-                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                        ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}
@@ -787,7 +790,7 @@ export default memo(function ResourceGrid({
                     <div
                       key={d.str}
                       className={`shrink-0 border-r border-border/30
-                        ${d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
+                        ${d.isHoliday ? 'bg-[var(--color-holiday)]' : d.isWeekend ? 'bg-[var(--color-weekend)]' : 'bg-sidebar'}`}
                       style={{ width: colWidth, height: ROW_H }}
                     />
                   ))}

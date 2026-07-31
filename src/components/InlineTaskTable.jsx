@@ -1,12 +1,42 @@
-import { memo } from 'react';
-import { Trash2, Diamond, Star } from 'lucide-react';
+import { memo, useCallback } from 'react';
+import { Trash2, Diamond, Star, GripVertical } from 'lucide-react';
 import { formatShortDate } from '../utils/dates';
 import { getTaskColor, getAllGroups } from '../utils/colors';
 import { ROW_HEIGHT, getHeaderHeight } from './GanttChart';
 
-export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onEdit, onDelete, onToggleSlide }) {
+export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onSelect, onEdit, onDelete, onToggleSlide, onReorder, onBeginReorder }) {
   const groups = getAllGroups(tasks);
   const HEADER_HEIGHT = getHeaderHeight(viewMode);
+
+  const handleDragStart = useCallback((e, taskIndex) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!onReorder) return;
+    onBeginReorder?.();
+    const startY = e.clientY;
+    let currentIndex = taskIndex;
+
+    function onMove(ev) {
+      const delta = Math.round((ev.clientY - startY) / ROW_HEIGHT);
+      const newIndex = Math.max(0, Math.min(tasks.length - 1, taskIndex + delta));
+      if (newIndex !== currentIndex) {
+        onReorder(currentIndex, newIndex);
+        currentIndex = newIndex;
+      }
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [tasks.length, onReorder, onBeginReorder]);
 
   return (
     <div
@@ -50,6 +80,16 @@ export default memo(function InlineTaskTable({ tasks, viewMode, selectedIds, onS
                 animationDelay: `${Math.min(index, 8) * 30}ms`,
               }}
             >
+              {/* Drag handle */}
+              {onReorder && (
+                <div
+                  onMouseDown={(e) => handleDragStart(e, index)}
+                  className="shrink-0 cursor-ns-resize text-text-muted/20 opacity-0 group-hover/row:opacity-100 hover:!text-text-muted transition"
+                  title="Drag to reorder"
+                >
+                  <GripVertical size={14} />
+                </div>
+              )}
               {/* Color dot */}
               <div
                 className="h-2.5 w-2.5 shrink-0 rounded-full"

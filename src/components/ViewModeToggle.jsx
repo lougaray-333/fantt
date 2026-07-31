@@ -5,6 +5,7 @@ export default function ViewModeToggle({ viewMode, onChange }) {
     { key: 'day', label: 'Day' },
     { key: 'week', label: 'Week' },
     { key: 'month', label: 'Month' },
+    { key: 'list', label: 'List' },
   ];
 
   const containerRef = useRef(null);

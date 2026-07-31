@@ -12,6 +12,8 @@
   --color-bar-default: #E52222;
   --color-today: #E52222;
   --color-weekend: #f3f3f3;
+  --color-holiday: rgba(251, 191, 36, 0.18);
+  --color-task-complete: #9ca3af;
   --color-grid: #d0d0d0;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;
@@ -32,6 +34,8 @@
   --color-bar-default: #E52222;
   --color-today: #E52222;
   --color-weekend: #080808;
+  --color-holiday: rgba(251, 191, 36, 0.07);
+  --color-task-complete: #4b5563;
   --color-grid: #2e2e2e;
   --color-logo-start: #E52222;
   --color-logo-end: #C41A1A;

@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useCallback, useEffect, useState } from 'react';
-import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays, snapToMonday, isNonWorkday } from '../utils/dates';
+import { formatDate, addDays, diffDays, isWeekend, getDateRange, formatShortDate, getMonday, businessDaysBetween, businessToCalendarDays, snapToMonday, isNonWorkday, computeAutoProgress } from '../utils/dates';
 import { getTaskColor, getAllGroups, getContrastColor, PRESET_HEXES } from '../utils/colors';
 
 export const ROW_HEIGHT = 44;
@@ -279,6 +279,7 @@ export default memo(function GanttChart({
         if (type === 'resize-start' || type === 'resize-end') {
           onResizeEnd?.(task.id);
         }
+        didDragRef.current = false;
       }
 
       document.body.style.cursor = type === 'move' ? 'grabbing' : 'ew-resize';
@@ -288,6 +289,147 @@ export default memo(function GanttChart({
     },
     [colWidth, onTaskUpdate, onBeginDrag, onBeginResize, onDragMove, onEndDrag, onResizeEnd, onMoveEnd, skipWeekends]
   );
+
+  // Direction-aware drag on task bar — vertical = reorder, horizontal = date move
+  const handleBarDrag = useCallback((e, task, taskIndex) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.button !== 0) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let decided = false;
+
+    function onMove(ev) {
+      if (decided) return;
+      const dx = Math.abs(ev.clientX - startX);
+      const dy = Math.abs(ev.clientY - startY);
+      if (dx < 4 && dy < 4) return;
+      decided = true;
+      cleanup();
+
+      if (dy > dx && onReorder) {
+        // Vertical: reorder
+        onBeginReorder?.();
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        let currentIndex = taskIndex;
+        function onReorderMove(ev2) {
+          const delta = Math.round((ev2.clientY - startY) / ROW_HEIGHT);
+          const newIndex = Math.max(0, Math.min(tasks.length - 1, taskIndex + delta));
+          if (newIndex !== currentIndex) {
+            onReorder(currentIndex, newIndex);
+            currentIndex = newIndex;
+          }
+        }
+        function onReorderUp() {
+          document.removeEventListener('mousemove', onReorderMove);
+          document.removeEventListener('mouseup', onReorderUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          didDragRef.current = false;
+        }
+        document.addEventListener('mousemove', onReorderMove);
+        document.addEventListener('mouseup', onReorderUp);
+      } else {
+        // Horizontal: date move
+        onBeginDrag(task.id);
+        const origStart = task.start;
+        let lastDelta = 0;
+
+        function onDateMove(ev2) {
+          const visualDelta = Math.round((ev2.clientX - startX) / colWidth);
+          const daysDelta = skipWeekends
+            ? businessToCalendarDays(origStart, visualDelta)
+            : visualDelta;
+          if (daysDelta === lastDelta) return;
+          lastDelta = daysDelta;
+          didDragRef.current = true;
+          const container = scrollRef.current;
+          const scrollLeft = container?.scrollLeft;
+          const scrollTop = container?.scrollTop;
+          onDragMove(task.id, daysDelta);
+          if (container) requestAnimationFrame(() => {
+            container.scrollLeft = scrollLeft;
+            container.scrollTop = scrollTop;
+          });
+        }
+
+        function onDateUp() {
+          document.removeEventListener('mousemove', onDateMove);
+          document.removeEventListener('mouseup', onDateUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          onEndDrag();
+          if (didDragRef.current) onMoveEnd?.(task.id);
+          didDragRef.current = false;
+        }
+
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onDateMove);
+        document.addEventListener('mouseup', onDateUp);
+      }
+    }
+
+    function onUp() { cleanup(); }
+    function cleanup() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [tasks.length, colWidth, skipWeekends, onReorder, onBeginReorder, onBeginDrag, onDragMove, onEndDrag, onMoveEnd]);
+
+  // Direction-aware drag on row background — vertical = reorder, horizontal = pan (existing)
+  const handleRowBackgroundDrag = useCallback((e, taskIndex) => {
+    if (e.button !== 0 || !onReorder) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let decided = false;
+
+    function onMove(ev) {
+      if (decided) return;
+      const dx = Math.abs(ev.clientX - startX);
+      const dy = Math.abs(ev.clientY - startY);
+      if (dx < 4 && dy < 4) return;
+      decided = true;
+      cleanup();
+      if (dy > dx) {
+        panRef.current = null; // cancel pan
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        onBeginReorder?.();
+        let currentIndex = taskIndex;
+        function onReorderMove(ev2) {
+          const delta = Math.round((ev2.clientY - startY) / ROW_HEIGHT);
+          const newIndex = Math.max(0, Math.min(tasks.length - 1, taskIndex + delta));
+          if (newIndex !== currentIndex) {
+            onReorder(currentIndex, newIndex);
+            currentIndex = newIndex;
+          }
+        }
+        function onReorderUp() {
+          document.removeEventListener('mousemove', onReorderMove);
+          document.removeEventListener('mouseup', onReorderUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+        document.addEventListener('mousemove', onReorderMove);
+        document.addEventListener('mouseup', onReorderUp);
+      }
+    }
+
+    function onUp() { cleanup(); }
+    function cleanup() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [tasks.length, onReorder, onBeginReorder]);
 
   // Vertical drag (reorder rows)
   const handleRowDragStart = useCallback(
@@ -528,6 +670,7 @@ export default memo(function GanttChart({
               x={0} y={i * ROW_HEIGHT} width={chartWidth} height={ROW_HEIGHT}
               fill={isRowSelected ? 'var(--color-accent-light)' : i % 2 === 1 ? 'var(--color-bg-alt)' : 'transparent'}
               opacity={isRowSelected ? 0.4 : 0.3}
+              onMouseDown={(e) => handleRowBackgroundDrag(e, i)}
             />
             {showGrid && <line x1={0} y1={(i + 1) * ROW_HEIGHT} x2={chartWidth} y2={(i + 1) * ROW_HEIGHT} stroke="var(--color-grid)" strokeWidth={1} />}
           </g>
@@ -571,7 +714,7 @@ export default memo(function GanttChart({
           const barWidth = Math.max(duration * colWidth, colWidth);
           const y = i * ROW_HEIGHT + BAR_Y_OFFSET;
           const color = getTaskColor(task, groups);
-          const progress = task.progress || 0;
+          const progress = task.autoProgress ? computeAutoProgress(task.start, task.end, holidays) : (task.progress || 0);
           const effectiveColor = progress === 100 ? 'var(--color-task-complete)' : color;
           // Preset and group-assigned colors are always dark enough for white text.
           // Only run contrast check for user-entered custom hex values.
@@ -656,7 +799,7 @@ export default memo(function GanttChart({
 
                 {/* Move handle (covers diamond) — no resize handles */}
                 <rect x={mx - ds} y={my - ds} width={2 * ds} height={2 * ds} fill="transparent" style={{ cursor: 'grab' }}
-                  onMouseDown={(e) => handleMouseDown(e, task, 'move')}
+                  onMouseDown={(e) => handleBarDrag(e, task, i)}
                   onClick={(e) => { if (!didDragRef.current) onTaskClick?.(task.id, e); }}
                 />
               </g>
@@ -688,7 +831,7 @@ export default memo(function GanttChart({
               </text>
 
               {barWidth > 30 && (
-                <text x={x + barWidth - 8} y={y + BAR_HEIGHT / 2 + 1} dominantBaseline="middle" textAnchor="end" fontSize={9} fontWeight={600} fill={textColor} opacity={0.75} clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
+                <text x={x + barWidth} y={y - 3} dominantBaseline="auto" textAnchor="end" fontSize={9} fontWeight={600} fill="var(--color-text-muted)" opacity={0.8} style={{ pointerEvents: 'none', fontFamily: 'var(--font-sans)' }}>
                   {progress}%
                 </text>
               )}
@@ -709,7 +852,7 @@ export default memo(function GanttChart({
               </g>
 
               <rect x={x + 8} y={y} width={Math.max(barWidth - 16, 4)} height={BAR_HEIGHT} fill="transparent" style={{ cursor: 'grab' }}
-                onMouseDown={(e) => handleMouseDown(e, task, 'move')}
+                onMouseDown={(e) => handleBarDrag(e, task, i)}
                 onClick={(e) => { if (!didDragRef.current) onTaskClick?.(task.id, e); }}
               />
 

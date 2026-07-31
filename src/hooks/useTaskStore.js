@@ -29,6 +29,7 @@ function rowToTask(row) {
     end: row.end_date,
     group: row.group || '',
     progress: row.progress || 0,
+    autoProgress: row.auto_progress ?? true,
     dependencies: row.dependencies || [],
     color: row.color || '',
     sortOrder: row.sort_order ?? 0,
@@ -48,6 +49,7 @@ function taskToRow(task, projectId) {
     end_date: task.end,
     group: task.group || '',
     progress: task.progress || 0,
+    auto_progress: task.autoProgress || false,
     dependencies: task.dependencies || [],
     color: task.color || '',
     sort_order: task.sortOrder ?? 0,
@@ -545,6 +547,22 @@ export function useTaskStore(projectId, { onRemoteChange, identity, holidays = [
     }
   }, [touchProject, recordHistory]);
 
+  const duplicateTask = useCallback((id) => {
+    const source = tasksRef.current.find(t => t.id === id);
+    if (!source) return;
+    return addTask({
+      name: source.name + ' Copy',
+      start: source.start,
+      end: source.end,
+      group: source.group,
+      progress: source.progress,
+      dependencies: [],
+      color: source.color,
+      assignees: source.assignees.map(a => ({ ...a })),
+      milestone: source.milestone,
+    }, id);
+  }, [addTask]);
+
   const reorderTasks = useCallback((fromIndex, toIndex) => {
     setTasks((prev) => {
       const next = [...prev];
@@ -659,6 +677,7 @@ export function useTaskStore(projectId, { onRemoteChange, identity, holidays = [
     resizeMove,
     endResize,
     deleteTask,
+    duplicateTask,
     reorderTasks,
     importTasks,
     updateProject,

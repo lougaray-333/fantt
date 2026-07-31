@@ -5,45 +5,16 @@ import { getTaskColor, getAllGroups } from '../utils/colors';
 const SLIDE_W = 1920;
 const SLIDE_H = 1080;
 const PAD_X   = 88;
-const LABEL_W = 280;
-const CHART_X = PAD_X + LABEL_W;
-const CHART_W = SLIDE_W - CHART_X - PAD_X;
 const RED     = '#E52222';
+const BLACK   = '#111111';
 const FONT    = "'Helvetica Neue', Arial, sans-serif";
 
-const THEMES = {
-  dark: {
-    bg:      '#0A0A0A',
-    surface: '#0F0F0F',
-    border:  'rgba(255,255,255,0.08)',
-    textHi:  '#FFFFFF',
-    textMid: '#E8E8E8',           // near-white — passes WCAG AA
-    textLo:  'rgba(255,255,255,0.50)',
-    grid:    'rgba(255,255,255,0.07)',
-    gridMaj: 'rgba(255,255,255,0.14)',
-    track:   'rgba(229,34,34,0.20)',
-    fill:    RED,
-    today:   'rgba(255,255,255,0.5)',
-  },
-  light: {
-    bg:      '#F8F8F7',
-    surface: '#ECECEA',
-    border:  'rgba(0,0,0,0.10)',
-    textHi:  '#0A0A0A',
-    textMid: '#1C1C1C',           // near-black — passes WCAG AA
-    textLo:  'rgba(0,0,0,0.48)',
-    grid:    'rgba(0,0,0,0.07)',
-    gridMaj: 'rgba(0,0,0,0.15)',
-    track:   'rgba(229,34,34,0.14)',
-    fill:    RED,
-    today:   'rgba(0,0,0,0.4)',
-  },
-};
+// Fantasy logo path (favicon.svg viewBox 0 0 129 130)
+const LOGO_PATH = 'M128.992248 24.2154558c0-7.837565-5.278685-17.83768403-17.043423-22.47559798-15.2381769-6.00684349-21.1734328 12.15235358-47.452701 12.15235358s-32.214524-18.15919707-47.4527007-12.15235358c-11.76473803 4.63791395-17.0434233 14.63803298-17.0434233 22.47559798 0 10.2510088 12.8466605 17.4455479 12.8466605 40.8021625 0 23.3569371-12.8466605 30.5514761-12.8466605 40.8024847 0 7.837565 5.27868527 17.838007 17.0434233 22.475598 15.2381767 6.006521 21.1734325-12.152353 47.4527007-12.152353s32.2145241 18.158874 47.452701 12.152353c11.764738-4.637591 17.043423-14.638033 17.043423-22.475598 0-10.2510086-12.84666-17.4455476-12.84666-40.8024847 0-23.3566146 12.84666-30.5511537 12.84666-40.8021625';
 
 export default function SlideExportModal({ tasks, projectName, onClose }) {
-  const svgRef = useRef(null);
-  const [theme, setTheme] = useState('dark');
-  const T = THEMES[theme];
+  const svgRef  = useRef(null);
+  const [title, setTitle] = useState('High-Level Engagement Timeline');
 
   const slideTasks = useMemo(() => {
     const marked = tasks.filter(t => t.inSlide);
@@ -54,67 +25,59 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
 
   const rows = useMemo(() =>
     slideTasks
-      .map(t => ({ label: t.name, start: t.start, end: t.end, progress: t.progress || 0 }))
+      .map(t => ({ ...t, label: t.name }))
       .sort((a, b) => a.start.localeCompare(b.start)),
-  [slideTasks, allGroups]);
+  [slideTasks]);
 
-  const { rangeStart, totalMs, weeks, dateLabel, todayMs } = useMemo(() => {
-    if (!rows.length) return { rangeStart: new Date(), totalMs: 86400000, weeks: [], dateLabel: '', todayMs: null };
-
+  // Build sequential week list starting from Monday of earliest task
+  const weeks = useMemo(() => {
+    if (!rows.length) return [];
     const rs = new Date(Math.min(...rows.map(r => new Date(r.start + 'T00:00:00'))));
     const re = new Date(Math.max(...rows.map(r => new Date(r.end   + 'T00:00:00'))));
-    re.setDate(re.getDate() + 1);
-    if (re <= rs) re.setMonth(re.getMonth() + 1);
-    const tms = re - rs;
-
-    // Snap to Monday of the week containing rangeStart
-    const weekAnchor = new Date(rs);
-    const dow = weekAnchor.getDay();
-    weekAnchor.setDate(weekAnchor.getDate() - (dow === 0 ? 6 : dow - 1));
-
-    // Build week ticks
-    const weeks = [];
-    const cur = new Date(weekAnchor);
+    const anchor = new Date(rs);
+    const dow = anchor.getDay();
+    anchor.setDate(anchor.getDate() - (dow === 0 ? 6 : dow - 1));
+    const list = [];
+    const cur  = new Date(anchor);
+    let   n    = 1;
     while (cur <= re) {
-      weeks.push(new Date(cur));
+      list.push({ date: new Date(cur), num: n++ });
       cur.setDate(cur.getDate() + 7);
     }
-
-    // Adaptive label frequency: show label every N weeks to avoid crowding
-    const pxPerWeek = CHART_W / weeks.length;
-    const labelEvery = pxPerWeek < 56 ? 4 : pxPerWeek < 100 ? 2 : 1;
-
-    // Annotate which weeks get a label
-    weeks.forEach((w, i) => {
-      w._label = i % labelEvery === 0;
-      w._major = w.getDate() <= 7; // first week of a month → major grid line
-    });
-
-    const fmt = d => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    const tm = new Date() - rs;
-    return {
-      rangeStart: rs, totalMs: tms, weeks,
-      dateLabel: `${fmt(new Date(rows[0].start + 'T00:00:00'))} – ${fmt(new Date(rows[rows.length-1].end + 'T00:00:00'))}`,
-      todayMs: (tm > 0 && tm < tms) ? tm : null,
-    };
+    return list;
   }, [rows]);
 
-  const ACCENT_H   = 10;
-  const TITLE_END  = ACCENT_H + 154;
-  const FOOTER_H   = 52;
-  const HEADER_H   = 48;
-  const AVAIL_ROWS = SLIDE_H - TITLE_END - FOOTER_H - HEADER_H;
-  const ROW_H      = Math.min(160, Math.max(72, Math.floor(AVAIL_ROWS / Math.max(rows.length, 1))));
-  const BAR_H      = Math.round(ROW_H * 0.52);
-  const BLOCK_H    = HEADER_H + rows.length * ROW_H;
-  const AVAIL      = SLIDE_H - TITLE_END - FOOTER_H;
-  const CHART_TOP  = TITLE_END + Math.max(20, (AVAIL - BLOCK_H) / 2);
-  const BODY_Y     = CHART_TOP + HEADER_H;
-  const br         = BAR_H / 2;
+  // ── Layout ───────────────────────────────────────────────────────────────
+  const TITLE_FONT    = 72;
+  const TITLE_BASE_Y  = 88 + TITLE_FONT;           // baseline of title text
+  const TABLE_TOP     = TITLE_BASE_Y + 64;
+  const BANNER_H      = 46;                         // "Week" black header row
+  const LABEL_H       = 54;                         // "Week N / date" sub-row
+  const HDR_H         = BANNER_H + LABEL_H;
+  const FOOTER_ZONE   = 72;
+  const TABLE_LEFT    = PAD_X;
+  const TABLE_RIGHT   = SLIDE_W - PAD_X;
+  const TABLE_W       = TABLE_RIGHT - TABLE_LEFT;
+  const TASK_COL_W    = Math.round(TABLE_W * 0.50); // 50/50 split
+  const WEEKS_W       = TABLE_W - TASK_COL_W;
+  const COL_W         = weeks.length > 0 ? WEEKS_W / weeks.length : WEEKS_W;
 
-  const xOf   = ms => CHART_X + (ms / totalMs) * CHART_W;
-  const xDate = s  => xOf(new Date(s + 'T00:00:00') - rangeStart);
-  const xObj  = d  => xOf(d - rangeStart);
+  const AVAIL_ROWS = SLIDE_H - TABLE_TOP - HDR_H - FOOTER_ZONE;
+  const ROW_H      = Math.min(90, Math.max(44, Math.floor(AVAIL_ROWS / Math.max(rows.length, 1))));
+  const TABLE_H    = HDR_H + rows.length * ROW_H;
+  const BODY_TOP   = TABLE_TOP + HDR_H;
+  const BODY_BOT   = TABLE_TOP + TABLE_H;
+
+  const LOGO_SCALE = 30 / 130;
+  const LOGO_Y     = SLIDE_H - 54;
+
+  function taskSpansWeek(task, weekStart) {
+    const wEnd = new Date(weekStart);
+    wEnd.setDate(wEnd.getDate() + 6);
+    const tS = new Date(task.start + 'T00:00:00');
+    const tE = new Date(task.end   + 'T00:00:00');
+    return tS <= wEnd && tE >= weekStart;
+  }
 
   function handleDownload() {
     const el = svgRef.current;
@@ -133,7 +96,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
       canvas.height = SLIDE_H;
       canvas.getContext('2d').drawImage(img, 0, 0, SLIDE_W, SLIDE_H);
       const a = document.createElement('a');
-      a.download = `${(projectName || 'project').replace(/\s+/g, '-').toLowerCase()}-schedule-${theme}.png`;
+      a.download = `${(projectName || 'project').replace(/\s+/g, '-').toLowerCase()}-timeline.png`;
       a.href = canvas.toDataURL('image/png');
       a.click();
       URL.revokeObjectURL(url);
@@ -147,146 +110,196 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
     <div className="fixed inset-0 z-[60] bg-black/75 flex items-center justify-center p-6">
       <div className="bg-sidebar border border-border rounded-xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden">
 
+        {/* Modal header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="text-sm font-bold text-text">Slide Preview</h2>
             <p className="text-xs text-text-muted mt-0.5">
-              {starredCount > 0 ? `${starredCount} starred task${starredCount !== 1 ? 's' : ''}` : `All ${tasks.length} tasks`} · 1920×1080 PNG
+              {starredCount > 0
+                ? `${starredCount} starred task${starredCount !== 1 ? 's' : ''}`
+                : `All ${tasks.length} tasks`} · 1920×1080 PNG
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
-              {['dark', 'light'].map(t => (
-                <button key={t} onClick={() => setTheme(t)}
-                  className={`px-3 py-1.5 transition capitalize ${
-                    theme === t ? 'bg-accent text-white' : 'text-text-muted hover:bg-bg-alt'
-                  }`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-            <button onClick={onClose} className="rounded-lg p-1 text-text-muted hover:bg-bg-alt transition">
-              <X size={18} />
-            </button>
-          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-text-muted hover:bg-bg-alt transition">
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="p-5 bg-bg-alt">
-          <div className="w-full rounded-lg overflow-hidden border border-border shadow-xl" style={{ aspectRatio: '16/9' }}>
+        {/* Title input */}
+        <div className="px-5 py-3 border-b border-border shrink-0">
+          <label className="text-xs font-medium text-text-muted mb-1.5 block">Slide title</label>
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. High-Level Engagement Timeline"
+            className="w-full rounded-lg border border-border bg-bg-alt px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
+          />
+        </div>
+
+        {/* Preview */}
+        <div className="p-5 bg-bg-alt overflow-auto">
+          <div
+            className="w-full rounded-lg overflow-hidden border border-border shadow-xl"
+            style={{ aspectRatio: '16/9' }}
+          >
             <svg
               ref={svgRef}
               viewBox={`0 0 ${SLIDE_W} ${SLIDE_H}`}
               style={{ width: '100%', height: '100%', display: 'block' }}
               xmlns="http://www.w3.org/2000/svg"
             >
-              {/* Background */}
-              <rect width={SLIDE_W} height={SLIDE_H} fill={T.bg} />
+              {/* ── Background ── */}
+              <rect width={SLIDE_W} height={SLIDE_H} fill="white" />
 
-              {/* Title surface */}
-              <rect x={0} y={ACCENT_H} width={SLIDE_W} height={TITLE_END - ACCENT_H} fill={T.surface} />
+              {/* ── Clip path for table contents ── */}
+              <defs>
+                <clipPath id="table-clip">
+                  <rect x={TABLE_LEFT} y={TABLE_TOP} width={TABLE_W} height={TABLE_H} />
+                </clipPath>
+              </defs>
 
-              {/* Red accent stripe */}
-              <rect width={SLIDE_W} height={ACCENT_H} fill={RED} />
-
-              {/* Project name */}
-              <text x={PAD_X} y={ACCENT_H + 87}
-                dominantBaseline="middle" fontSize={68} fontWeight={800}
-                fill={T.textHi} fontFamily={FONT}>
-                {projectName}
+              {/* ── Title ── */}
+              <text
+                x={TABLE_LEFT} y={TITLE_BASE_Y}
+                fontSize={TITLE_FONT} fontWeight={800}
+                fill={BLACK} fontFamily={FONT}>
+                {title || 'High-Level Engagement Timeline'}
               </text>
 
-              {/* Date range */}
-              <text x={SLIDE_W - PAD_X} y={ACCENT_H + 87}
-                dominantBaseline="middle" textAnchor="end"
-                fontSize={22} fill={T.textLo} fontFamily={FONT}>
-                {dateLabel}
+              {/* ── Table outer border ── */}
+              <rect
+                x={TABLE_LEFT} y={TABLE_TOP}
+                width={TABLE_W} height={TABLE_H}
+                fill="white" stroke={BLACK} strokeWidth={1.5}
+              />
+
+              {/* ── All table interior content clipped to table bounds ── */}
+              <g clipPath="url(#table-clip)">
+
+              {/* ── "Week" banner (black, spans week columns) ── */}
+              <rect
+                x={TABLE_LEFT + TASK_COL_W} y={TABLE_TOP}
+                width={WEEKS_W} height={BANNER_H}
+                fill={BLACK}
+              />
+              <text
+                x={TABLE_LEFT + TASK_COL_W + WEEKS_W / 2}
+                y={TABLE_TOP + BANNER_H / 2}
+                dominantBaseline="middle" textAnchor="middle"
+                fontSize={18} fontWeight={700} fill="white" fontFamily={FONT}>
+                Week
               </text>
 
-              {/* Title divider */}
-              <line x1={0} y1={TITLE_END} x2={SLIDE_W} y2={TITLE_END} stroke={T.border} strokeWidth={1} />
-
-              {/* Week grid lines + labels */}
+              {/* ── Week label sub-row ── */}
               {weeks.map((w, i) => {
-                const x = xObj(w);
-                if (x < CHART_X - 1) return null;
-                const isMajor = w._major;
+                const cx      = TABLE_LEFT + TASK_COL_W + i * COL_W;
+                const dateStr = w.date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
                 return (
-                  <g key={i}>
-                    <line x1={x} y1={CHART_TOP} x2={x} y2={BODY_Y + rows.length * ROW_H}
-                      stroke={isMajor ? T.gridMaj : T.grid}
-                      strokeWidth={isMajor ? 1 : 0.5} />
-                    {w._label && (
-                      <text x={x + 10} y={CHART_TOP + HEADER_H / 2}
-                        dominantBaseline="middle" fontSize={13} fontWeight={600}
-                        fill={T.textLo} fontFamily={FONT}>
-                        {w.toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric',
-                          ...(isMajor && w.getMonth() === 0 ? { year: '2-digit' } : {}),
-                        })}
-                      </text>
-                    )}
+                  <g key={`wlbl-${i}`}>
+                    {i > 0 && <>
+                      {/* Divider through black banner */}
+                      <line x1={cx} y1={TABLE_TOP} x2={cx} y2={TABLE_TOP + BANNER_H}
+                        stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+                      {/* Divider through label row */}
+                      <line x1={cx} y1={TABLE_TOP + BANNER_H} x2={cx} y2={TABLE_TOP + HDR_H}
+                        stroke="rgba(0,0,0,0.12)" strokeWidth={1} />
+                    </>}
+                    <text
+                      x={cx + COL_W / 2} y={TABLE_TOP + BANNER_H + LABEL_H * 0.34}
+                      dominantBaseline="middle" textAnchor="middle"
+                      fontSize={15} fontStyle="italic" fill={BLACK} fontFamily={FONT}>
+                      {`Week ${w.num}`}
+                    </text>
+                    <text
+                      x={cx + COL_W / 2} y={TABLE_TOP + BANNER_H + LABEL_H * 0.72}
+                      dominantBaseline="middle" textAnchor="middle"
+                      fontSize={13} fontStyle="italic" fill="rgba(0,0,0,0.45)" fontFamily={FONT}>
+                      {dateStr}
+                    </text>
                   </g>
                 );
               })}
 
-              {/* Today marker */}
-              {todayMs && (
-                <line x1={xOf(todayMs)} y1={CHART_TOP} x2={xOf(todayMs)} y2={BODY_Y + rows.length * ROW_H}
-                  stroke={T.today} strokeWidth={2} strokeDasharray="5 4" />
-              )}
+              {/* ── Header bottom border ── */}
+              <line
+                x1={TABLE_LEFT} y1={TABLE_TOP + HDR_H}
+                x2={TABLE_RIGHT} y2={TABLE_TOP + HDR_H}
+                stroke={BLACK} strokeWidth={1}
+              />
 
-              {/* Task rows */}
-              {rows.map((row, i) => {
-                const rowY  = BODY_Y + i * ROW_H;
-                const barY  = rowY + (ROW_H - BAR_H) / 2;
-                const endD  = new Date(row.end + 'T00:00:00');
-                endD.setDate(endD.getDate() + 1);
-                const bx    = xDate(row.start);
-                const bw    = Math.max(xObj(endD) - bx, 10);
-                const fillW = bw * row.progress / 100;
+              {/* ── Vertical divider: task names | weeks (full height) ── */}
+              <line
+                x1={TABLE_LEFT + TASK_COL_W} y1={TABLE_TOP}
+                x2={TABLE_LEFT + TASK_COL_W} y2={BODY_BOT}
+                stroke={BLACK} strokeWidth={1.5}
+              />
 
+              {/* ── Column dividers in body (dashed, full body height) ── */}
+              {weeks.map((_, i) => {
+                if (i === 0) return null;
+                const cx = TABLE_LEFT + TASK_COL_W + i * COL_W;
                 return (
-                  <g key={`${row.label}-${i}`}>
-                    {i > 0 && (
-                      <line x1={PAD_X} y1={rowY} x2={SLIDE_W - PAD_X} y2={rowY}
-                        stroke={T.grid} strokeWidth={0.5} />
-                    )}
+                  <line key={`cdiv-${i}`}
+                    x1={cx} y1={BODY_TOP} x2={cx} y2={BODY_BOT}
+                    stroke="rgba(0,0,0,0.15)" strokeWidth={1}
+                    strokeDasharray="3 3"
+                  />
+                );
+              })}
 
-                    {/* Task label */}
-                    <text x={PAD_X + LABEL_W - 28} y={rowY + ROW_H / 2}
-                      dominantBaseline="middle" textAnchor="end"
-                      fontSize={20} fontWeight={600} fill={T.textMid} fontFamily={FONT}>
+              {/* ── Row dividers (dashed, full table width) ── */}
+              {rows.map((_, ri) => {
+                if (ri === 0) return null;
+                const ry = BODY_TOP + ri * ROW_H;
+                return (
+                  <line key={`rdiv-${ri}`}
+                    x1={TABLE_LEFT} y1={ry} x2={TABLE_RIGHT} y2={ry}
+                    stroke="rgba(0,0,0,0.18)" strokeWidth={1}
+                    strokeDasharray="3 3"
+                  />
+                );
+              })}
+
+              {/* ── Task rows ── */}
+              {rows.map((row, ri) => {
+                const rowY     = BODY_TOP + ri * ROW_H;
+                const taskColor = getTaskColor(row, allGroups);
+                return (
+                  <g key={`row-${ri}`}>
+                    {/* Task name */}
+                    <text
+                      x={TABLE_LEFT + 24} y={rowY + ROW_H / 2}
+                      dominantBaseline="middle"
+                      fontSize={19} fill={BLACK} fontFamily={FONT}>
                       {row.label}
                     </text>
-
-                    {/* Track */}
-                    <rect x={bx} y={barY} width={bw} height={BAR_H}
-                      rx={br} ry={br} fill={T.track} />
-
-                    {/* Progress fill */}
-                    {row.progress > 0 && (
-                      <rect x={bx} y={barY} width={fillW} height={BAR_H}
-                        rx={br} ry={br} fill={T.fill} />
-                    )}
+                    {/* Filled week cells */}
+                    {weeks.map((w, wi) => {
+                      if (!taskSpansWeek(row, w.date)) return null;
+                      const cellX = TABLE_LEFT + TASK_COL_W + wi * COL_W;
+                      return (
+                        <rect key={`cell-${ri}-${wi}`}
+                          x={cellX + 1} y={rowY + 1}
+                          width={COL_W - 2} height={ROW_H - 2}
+                          fill={taskColor}
+                        />
+                      );
+                    })}
                   </g>
                 );
               })}
 
-              {/* Bottom rule */}
-              <line x1={PAD_X} y1={BODY_Y + rows.length * ROW_H}
-                x2={SLIDE_W - PAD_X} y2={BODY_Y + rows.length * ROW_H}
-                stroke={T.border} strokeWidth={1} />
+              </g>{/* end clip group */}
 
-              {/* Footer */}
-              <text x={SLIDE_W - PAD_X} y={SLIDE_H - FOOTER_H / 2}
-                dominantBaseline="middle" textAnchor="end"
-                fontSize={13} fill={T.textLo} fontFamily={FONT}>
-                fantt.vercel.app
-              </text>
+              {/* ── Fantasy logo ── */}
+              <g transform={`translate(${TABLE_LEFT}, ${LOGO_Y}) scale(${LOGO_SCALE})`}>
+                <path d={LOGO_PATH} fill={RED} fillRule="evenodd" />
+              </g>
             </svg>
           </div>
         </div>
 
+        {/* Footer actions */}
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
           <button onClick={onClose}
             className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-text-muted hover:bg-bg-alt transition">
@@ -295,7 +308,7 @@ export default function SlideExportModal({ tasks, projectName, onClose }) {
           <button onClick={handleDownload}
             className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition">
             <Download size={13} />
-            Download {theme}
+            Download PNG
           </button>
         </div>
       </div>

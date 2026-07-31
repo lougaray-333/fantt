@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Grid3x3, Share2, History, CalendarDays } from 'lucide-react';
+import { Library, Trash2, BarChart3, Plus, X, Sun, Moon, ArrowLeft, Check, Zap, Undo2, Redo2, CalendarOff, Grid3x3, Share2, History, CalendarDays, Bug, Settings, Download } from 'lucide-react';
 import FanttLogo from './FanttLogo';
 import { useTaskStore } from '../hooks/useTaskStore';
 import { useTheme } from '../hooks/useTheme';
@@ -7,12 +7,14 @@ import { formatDate, addDays, isWeekend, isNonWorkday, businessDaysBetween, busi
 import GanttChart, { COL_WIDTHS } from './GanttChart';
 import TaskForm from './TaskForm';
 import InlineTaskTable from './InlineTaskTable';
+import ListView from './ListView';
 import ViewModeToggle from './ViewModeToggle';
 
 const ActivityLibrary = lazy(() => import('./ActivityLibrary'));
 const BugReportButton = lazy(() => import('./BugReportButton'));
 import ResourceGrid from './ResourceGrid';
 import SharePanel from './SharePanel';
+import ExportModal from './ExportModal';
 import HolidayPanel from './HolidayPanel';
 import { useHistory } from '../hooks/useHistory';
 import { usePresence } from '../hooks/usePresence';
@@ -154,6 +156,13 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   const [showGrid, setShowGrid] = useState(() => {
     try { const v = localStorage.getItem('gantt-v2-show-grid'); return v === null ? true : JSON.parse(v); } catch { return true; }
   });
+  const [bugReportOpen, setBugReportOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [logoRot, setLogoRot] = useState(0);
+  const logoRotRef = useRef(0);
+  const settingsRef = useRef(null);
+  const settingsDropdownRef = useRef(null);
   // Persist preferences to localStorage
   useEffect(() => {
     localStorage.setItem('gantt-v2-hide-weekends', JSON.stringify(hideWeekends));
@@ -161,6 +170,7 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   useEffect(() => {
     localStorage.setItem('gantt-v2-show-grid', JSON.stringify(showGrid));
   }, [showGrid]);
+
 
   // Undo/Redo
   const stateRef = useRef({ tasks: [], resourceHours: {}, oopExpenses: [], hiddenRoles: [], roleNames: {}, roleRates: {} });
@@ -603,6 +613,17 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     }
   };
 
+  const handleDuplicateTask = useCallback((id) => {
+    snap();
+    const newTask = store.duplicateTask(id);
+    if (newTask) {
+      setSelectedIds(new Set([newTask.id]));
+      setEditingId(newTask.id);
+      setAnimatingTask({ id: newTask.id, type: 'pop-in' });
+      setTimeout(() => setAnimatingTask(null), 400);
+    }
+  }, [store, snap]);
+
   const handleDeleteTask = useCallback((id) => {
     const task = store.tasks.find((t) => t.id === id);
     if (!task || !confirm(`Delete "${task.name}"?`)) return;
@@ -643,6 +664,19 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
     }, 250);
   };
 
+  // Close settings dropdown on outside click
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e) => {
+      const inBtn = settingsRef.current?.contains(e.target);
+      const inDrop = settingsDropdownRef.current?.contains(e.target);
+      if (!inBtn && !inDrop) setSettingsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
+
+
   if (store.loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
@@ -654,8 +688,9 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* Top bar */}
-      <div className="flex items-center border-b border-border px-4 py-2 bg-sidebar shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="relative border-b border-border bg-sidebar shrink-0">
+        {/* Primary row — always visible */}
+        <div className="flex items-center gap-3 px-4 h-10">
           {/* Back button */}
           {onBack && (
             <button
@@ -667,289 +702,331 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             </button>
           )}
 
-          {/* Logo */}
-          <div className="flex flex-col leading-none gap-0.5">
-            <span className="text-sm font-bold tracking-tight text-text">Fantt Chart</span>
+          {/* View mode — includes List */}
+          <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+
+          {/* Project name — centered */}
+          {projectName && (
+            <div className="flex-1 flex justify-center min-w-0 px-4">
+              <span className="text-sm font-medium text-text-muted truncate">{projectName}</span>
+            </div>
+          )}
+
+          {/* Right: spinning Fantasy shield */}
+          <div
+            className="ml-auto select-none pointer-events-none"
+            style={{
+              transform: `rotate(${logoRot}deg)`,
+              transition: 'transform 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+            }}
+          >
+            <FanttLogo size={14} color="rgba(255,255,255,0.35)" />
+          </div>
+        </div>
+
+        {/* Secondary row — always visible */}
+        <div className="flex items-center gap-1 px-4 pb-2">
+            {/* Grid / Weekends / Theme — display toggles grouped */}
+            {viewMode !== 'list' && (
+              <button
+                onClick={() => setShowGrid(g => !g)}
+                className={`rounded-lg p-1.5 transition ${
+                  showGrid ? 'bg-accent/15 text-accent' : 'text-text-muted hover:bg-bg-alt'
+                }`}
+                title={showGrid ? 'Hide grid' : 'Show grid'}
+              >
+                <Grid3x3 size={13} />
+              </button>
+            )}
+            {viewMode !== 'list' && (
+              <button
+                onClick={() => setHideWeekends(h => !h)}
+                className={`rounded-lg p-1.5 transition ${
+                  hideWeekends ? 'bg-accent/15 text-accent' : 'text-text-muted hover:bg-bg-alt'
+                }`}
+                title={hideWeekends ? 'Show weekends' : 'Hide weekends'}
+              >
+                <CalendarOff size={13} />
+              </button>
+            )}
+            <button
+              onClick={toggleTheme}
+              className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition"
+              title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+            >
+              {theme === 'fantasy' ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
+
+            <div className="h-4 w-px bg-border/60 mx-0.5" />
+
+            {/* Undo / Redo / History — grouped */}
+            <button
+              onClick={() => { const s = history.undo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
+              disabled={!history.canUndo}
+              className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Cmd+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button
+              onClick={() => { const s = history.redo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
+              disabled={!history.canRedo}
+              className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Cmd+Shift+Z)"
+            >
+              <Redo2 size={14} />
+            </button>
+            <button
+              onClick={() => setHistoryOpen(o => !o)}
+              className={`rounded-lg p-1.5 transition ${historyOpen ? 'bg-bg-alt text-text' : 'text-text-muted hover:bg-bg-alt'}`}
+              title="Change history"
+            >
+              <History size={13} />
+            </button>
+
+            {/* Delete selected */}
+            {selectedIds.size > 1 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition"
+              >
+                <Trash2 size={13} />
+                Delete {selectedIds.size}
+              </button>
+            )}
+
+            {/* Avatar, Add task, Library, Share, Collaborators — grouped with left tools */}
             <div className="flex items-center gap-1">
-              <FanttLogo size={9} color="rgba(255,255,255,0.35)" />
-              <span className="text-[10px] font-light text-text-muted/60">Created by Fantasy</span>
+              {/* You avatar */}
+              {email && (() => {
+                try {
+                  const local = email.includes('@') ? email.split('@')[0] : email;
+                  const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+                  const initials = parts.length >= 2
+                    ? (parts[0][0] + parts[1][0]).toUpperCase()
+                    : parts[0]?.[0]?.toUpperCase() || '?';
+                  const savedLabel = store.saveStatus === 'saving'
+                    ? 'Saving…'
+                    : store.lastSavedAt
+                      ? `Saved ${store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : null;
+                  const tooltip = [email, savedLabel].filter(Boolean).join(' · ');
+                  return (
+                    <div
+                      title={tooltip}
+                      className={store.saveStatus === 'saving' ? 'animate-pulse' : ''}
+                      style={{
+                        width: 24, height: 24,
+                        borderRadius: '50%',
+                        background: 'var(--color-accent)',
+                        color: '#fff',
+                        fontSize: 9, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '2px solid var(--color-bg)',
+                        outline: store.saveStatus === 'saving' ? '2px solid var(--color-accent)' : 'none',
+                        outlineOffset: '2px',
+                        cursor: 'default', flexShrink: 0,
+                        marginRight: 4,
+                      }}
+                    >
+                      {initials}
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
+
+              <div className="h-4 w-px bg-border/60 mx-0.5" />
+
+              {/* Add Task CTA */}
+              <button
+                onClick={handleOpenAdd}
+                className="flex items-center gap-1.5 rounded-lg bg-accent/10 border border-accent/20 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20 hover:border-accent/40 transition"
+              >
+                <Plus size={12} />
+                Add task
+              </button>
+
+              <div className="h-4 w-px bg-border/60 mx-0.5" />
+
+              {/* Library icon */}
+              <button
+                onClick={() => setLibraryOpen(true)}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition"
+                title="Activity Library"
+              >
+                <Library size={14} />
+              </button>
+
+              <div className="h-4 w-px bg-border/60 mx-0.5" />
+
+              {/* Share icon */}
+              <button
+                onClick={() => setSharePanelOpen(true)}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition"
+                title="Share project"
+              >
+                <Share2 size={13} />
+              </button>
+
+              {/* Export */}
+              <button
+                onClick={() => setExportOpen(true)}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition"
+                title="Export PNG / PDF / Excel"
+              >
+                <Download size={13} />
+              </button>
+
+              {/* Collaborator avatars */}
+              {others.length > 0 && (() => {
+                const MAX_VISIBLE = 3;
+                const avatarColors = [
+                  { bg: '#4f8ef7', text: '#fff' },
+                  { bg: '#f7874f', text: '#fff' },
+                  { bg: '#7c4ff7', text: '#fff' },
+                  { bg: '#2db87e', text: '#fff' },
+                  { bg: '#f7c94f', text: '#000' },
+                ];
+                const getInitials = (label) => {
+                  try {
+                    const local = label.includes('@') ? label.split('@')[0] : label;
+                    const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+                    const result = parts.length >= 2
+                      ? (parts[0][0] + parts[1][0]).toUpperCase()
+                      : parts[0]?.[0]?.toUpperCase() || '?';
+                    return result || label[0].toUpperCase();
+                  } catch { return label[0]?.toUpperCase() || '?'; }
+                };
+                const overflow = others.length - MAX_VISIBLE;
+                return (
+                  <div className="group/col relative flex items-center ml-1" style={{ gap: 0 }}>
+                    {others.slice(0, MAX_VISIBLE).map((user, i) => {
+                      const label = user.identity || 'Collaborator';
+                      const c = avatarColors[i % avatarColors.length];
+                      return (
+                        <div
+                          key={user.key}
+                          style={{
+                            width: 22, height: 22,
+                            borderRadius: '50%',
+                            background: c.bg,
+                            color: c.text,
+                            fontSize: 9, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '2px solid var(--color-bg)',
+                            marginLeft: i === 0 ? 0 : -8,
+                            zIndex: MAX_VISIBLE - i,
+                            position: 'relative',
+                            cursor: 'default', flexShrink: 0,
+                          }}
+                        >
+                          {getInitials(label)}
+                        </div>
+                      );
+                    })}
+                    {overflow > 0 && (
+                      <div
+                        style={{
+                          width: 22, height: 22,
+                          borderRadius: '50%',
+                          background: 'var(--color-bg-alt)',
+                          color: 'var(--color-text-muted)',
+                          fontSize: 9, fontWeight: 700,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: '2px solid var(--color-bg)',
+                          marginLeft: -8, position: 'relative', zIndex: 0, flexShrink: 0,
+                          cursor: 'default',
+                        }}
+                      >
+                        +{overflow}
+                      </div>
+                    )}
+                    <div className="pointer-events-none absolute bottom-full right-0 mb-2.5 hidden group-hover/col:block z-50">
+                      <div className="rounded-lg border border-border bg-sidebar shadow-xl px-3 py-2.5 min-w-[160px]">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted/60 mb-2">
+                          In this file
+                        </p>
+                        <div className="flex flex-col gap-1.5">
+                          {others.map((user, i) => {
+                            const label = user.identity || 'Collaborator';
+                            const c = avatarColors[i % avatarColors.length];
+                            return (
+                              <div key={user.key} className="flex items-center gap-2">
+                                <div
+                                  style={{
+                                    width: 18, height: 18,
+                                    borderRadius: '50%',
+                                    background: c.bg,
+                                    color: c.text,
+                                    fontSize: 9, fontWeight: 700,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {getInitials(label)}
+                                </div>
+                                <span className="text-xs text-text truncate max-w-[140px]">{label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="absolute -bottom-1.5 right-4 w-3 h-3 rotate-45 border-b border-r border-border bg-sidebar" />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Settings gear */}
+              <div className="relative ml-1" ref={settingsRef}>
+                <button
+                  onClick={() => setSettingsOpen(o => !o)}
+                  className={`rounded-lg p-1.5 transition ${settingsOpen ? 'bg-bg-alt text-text' : 'text-text-muted hover:bg-bg-alt'}`}
+                  title="Settings"
+                >
+                  <Settings size={13} />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* View mode */}
-          <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-
-          {/* Hide weekends toggle */}
-          <button
-            onClick={() => setHideWeekends((h) => !h)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-              hideWeekends
-                ? 'bg-accent/15 text-accent'
-                : 'text-text-muted hover:bg-bg-alt'
-            }`}
-            title={hideWeekends ? 'Show weekends' : 'Hide weekends'}
+        {/* Settings dropdown */}
+        {settingsOpen && (
+          <div
+            ref={settingsDropdownRef}
+            className="absolute right-4 top-full mt-1 z-[200] rounded-lg border border-border bg-sidebar shadow-xl overflow-hidden min-w-[180px]"
           >
-            <CalendarOff size={13} />
-            Weekends
-          </button>
-
-          {/* Holidays */}
-          <button
-            onClick={() => setShowHolidayPanel(true)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-              holidays.length > 0
-                ? 'bg-accent/15 text-accent'
-                : 'text-text-muted hover:bg-bg-alt'
-            }`}
-            title="Manage project holidays"
-          >
-            <CalendarDays size={13} />
-            Holidays{holidays.length > 0 ? ` (${holidays.length})` : ''}
-          </button>
-
-          {/* Grid toggle */}
-          <button
-            onClick={() => setShowGrid((g) => !g)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-              showGrid
-                ? 'bg-accent/15 text-accent'
-                : 'text-text-muted hover:bg-bg-alt'
-            }`}
-            title={showGrid ? 'Hide grid' : 'Show grid'}
-          >
-            <Grid3x3 size={13} />
-            Grid
-          </button>
-        </div>
-
-        {/* Project name — centered */}
-        {projectName && (
-          <div className="flex-1 flex justify-center min-w-0 px-4">
-            <span className="text-sm font-medium text-text-muted truncate">{projectName}</span>
+            <button
+              onClick={() => { setSettingsOpen(false); setShowHolidayPanel(true); }}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-text hover:bg-bg-alt transition"
+            >
+              <CalendarDays size={12} />
+              Holidays {holidays.length > 0 ? `(${holidays.length})` : ''}
+            </button>
+            <div className="h-px bg-border/40" />
+            <button
+              onClick={() => { setSettingsOpen(false); setBugReportOpen(true); }}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-text hover:bg-bg-alt transition"
+            >
+              <Bug size={12} />
+              Report a Bug
+            </button>
           </div>
         )}
-
-        <div className="flex items-center gap-2">
-          {/* Group 1: Edit */}
-          <button
-            onClick={() => { const s = history.undo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
-            disabled={!history.canUndo}
-            className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Undo (Cmd+Z)"
-          >
-            <Undo2 size={15} />
-          </button>
-          <button
-            onClick={() => { const s = history.redo(getCurrentSnapshot()); if (s) restoreSnapshot(s); }}
-            disabled={!history.canRedo}
-            className="rounded-lg p-1.5 text-text-muted hover:bg-bg-alt transition disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Redo (Cmd+Shift+Z)"
-          >
-            <Redo2 size={15} />
-          </button>
-          {selectedIds.size > 1 && (
-            <button
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition"
-            >
-              <Trash2 size={14} />
-              Delete {selectedIds.size}
-            </button>
-          )}
-
-          <div className="h-4 w-px bg-border/60" />
-
-          {/* Group 2: Create */}
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
-          >
-            <Plus size={14} />
-            Add Task
-          </button>
-          <button
-            onClick={() => setLibraryOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition"
-          >
-            <Library size={14} />
-            Library
-          </button>
-
-          <div className="h-4 w-px bg-border/60" />
-
-          {/* Group 3: Share & collaborate */}
-          <button
-            onClick={() => setSharePanelOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-alt transition"
-            title="Share project"
-          >
-            <Share2 size={13} />
-            Share
-          </button>
-          <button
-            onClick={() => setHistoryOpen(o => !o)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${historyOpen ? 'bg-bg-alt text-text' : 'text-text-muted hover:bg-bg-alt'}`}
-            title="Change history"
-          >
-            <History size={13} />
-          </button>
-
-          {/* Collaborator avatars */}
-          {others.length > 0 && (() => {
-            const MAX_VISIBLE = 3;
-            const avatarColors = [
-              { bg: '#4f8ef7', text: '#fff' },
-              { bg: '#f7874f', text: '#fff' },
-              { bg: '#7c4ff7', text: '#fff' },
-              { bg: '#2db87e', text: '#fff' },
-              { bg: '#f7c94f', text: '#000' },
-            ];
-            const getInitials = (label) => {
-              try {
-                const local = label.includes('@') ? label.split('@')[0] : label;
-                const parts = local.split(/[.\-_\s]+/).filter(Boolean);
-                const result = parts.length >= 2
-                  ? (parts[0][0] + parts[1][0]).toUpperCase()
-                  : parts[0]?.[0]?.toUpperCase() || '?';
-                return result || label[0].toUpperCase();
-              } catch { return label[0]?.toUpperCase() || '?'; }
-            };
-            const overflow = others.length - MAX_VISIBLE;
-            return (
-              <div className="group relative flex items-center" style={{ gap: 0 }}>
-                {/* Stacked circles — max 3 visible */}
-                {others.slice(0, MAX_VISIBLE).map((user, i) => {
-                  const label = user.identity || 'Collaborator';
-                  const c = avatarColors[i % avatarColors.length];
-                  return (
-                    <div
-                      key={user.key}
-                      style={{
-                        width: 26, height: 26,
-                        borderRadius: '50%',
-                        background: c.bg,
-                        color: c.text,
-                        fontSize: 10, fontWeight: 700,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '2px solid var(--color-bg)',
-                        marginLeft: i === 0 ? 0 : -8,
-                        zIndex: MAX_VISIBLE - i,
-                        position: 'relative',
-                        cursor: 'default', flexShrink: 0,
-                      }}
-                    >
-                      {getInitials(label)}
-                    </div>
-                  );
-                })}
-                {overflow > 0 && (
-                  <div
-                    style={{
-                      width: 26, height: 26,
-                      borderRadius: '50%',
-                      background: 'var(--color-bg-alt)',
-                      color: 'var(--color-text-muted)',
-                      fontSize: 9, fontWeight: 700,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '2px solid var(--color-bg)',
-                      marginLeft: -8, position: 'relative', zIndex: 0, flexShrink: 0,
-                      cursor: 'default',
-                    }}
-                  >
-                    +{overflow}
-                  </div>
-                )}
-
-                {/* Hover popover — shows everyone in the file */}
-                <div className="pointer-events-none absolute bottom-full right-0 mb-2.5 hidden group-hover:block z-50">
-                  <div className="rounded-lg border border-border bg-sidebar shadow-xl px-3 py-2.5 min-w-[160px]">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted/60 mb-2">
-                      In this file
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {others.map((user, i) => {
-                        const label = user.identity || 'Collaborator';
-                        const c = avatarColors[i % avatarColors.length];
-                        return (
-                          <div key={user.key} className="flex items-center gap-2">
-                            <div
-                              style={{
-                                width: 20, height: 20,
-                                borderRadius: '50%',
-                                background: c.bg,
-                                color: c.text,
-                                fontSize: 9, fontWeight: 700,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {getInitials(label)}
-                            </div>
-                            <span className="text-xs text-text truncate max-w-[140px]">{label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  {/* Arrow */}
-                  <div className="absolute -bottom-1.5 right-4 w-3 h-3 rotate-45 border-b border-r border-border bg-sidebar" />
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* You avatar — shows your initials; tooltip has email + save status */}
-          {email && (() => {
-            try {
-              const local = email.includes('@') ? email.split('@')[0] : email;
-              const parts = local.split(/[.\-_\s]+/).filter(Boolean);
-              const initials = parts.length >= 2
-                ? (parts[0][0] + parts[1][0]).toUpperCase()
-                : parts[0]?.[0]?.toUpperCase() || '?';
-              const savedLabel = store.saveStatus === 'saving'
-                ? 'Saving…'
-                : store.lastSavedAt
-                  ? `Saved ${store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                  : null;
-              const tooltip = [email, savedLabel].filter(Boolean).join(' · ');
-              return (
-                <div
-                  title={tooltip}
-                  className={store.saveStatus === 'saving' ? 'animate-pulse' : ''}
-                  style={{
-                    width: 26, height: 26,
-                    borderRadius: '50%',
-                    background: 'var(--color-accent)',
-                    color: '#fff',
-                    fontSize: 10, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '2px solid var(--color-bg)',
-                    outline: store.saveStatus === 'saving' ? '2px solid var(--color-accent)' : 'none',
-                    outlineOffset: '2px',
-                    cursor: 'default', flexShrink: 0,
-                  }}
-                >
-                  {initials}
-                </div>
-              );
-            } catch { return null; }
-          })()}
-
-          <div className="h-4 w-px bg-border/60" />
-
-          {/* Group 4: Settings */}
-          <button
-            onClick={toggleTheme}
-            className="rounded-lg border border-border p-1.5 text-text-muted hover:bg-bg-alt transition"
-            title={theme === 'fantasy' ? 'Switch to Light mode' : 'Switch to Dark mode'}
-          >
-            {theme === 'fantasy' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-        </div>
       </div>
 
       {/* Main content */}
-      {store.tasks.length === 0 ? (
+      {viewMode === 'list' ? (
+        <ListView
+          tasks={store.tasks}
+          onTaskUpdate={(id, updates) => store.updateTask(id, updates)}
+          onTaskClick={(id) => {
+            handleSelect(id, false);
+            setEditingId(id);
+            setFormOpen(true);
+          }}
+        />
+      ) : store.tasks.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <BarChart3 size={48} className="mx-auto text-border" />
@@ -997,6 +1074,15 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               onEdit={handleRowEdit}
               onDelete={handleDeleteTask}
               onToggleSlide={(id, val) => store.updateTask(id, { inSlide: val })}
+              onBeginReorder={() => snap()}
+              onReorder={(fromIndex, toIndex) => {
+                store.reorderTasks(fromIndex, toIndex);
+                const task = store.tasks[fromIndex];
+                if (task) {
+                  setAnimatingTask({ id: task.id, type: 'slot' });
+                  setTimeout(() => setAnimatingTask(null), 220);
+                }
+              }}
             />
             <GanttChart
               tasks={store.tasks}
@@ -1291,9 +1377,11 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
               <TaskForm
                 editingTask={editingTask}
                 tasks={store.tasks}
+                holidays={holidays}
                 onSubmit={handleAddOrUpdate}
                 onCancel={handleCloseForm}
                 onDelete={handleDeleteTask}
+                onDuplicate={handleDuplicateTask}
                 defaultStart={(() => {
                   if (editingTask || !insertAfterId) return undefined;
                   const anchor = store.tasks.find(t => t.id === insertAfterId);
@@ -1315,15 +1403,24 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         />
       </Suspense>
 
-      {/* Bug Report Button */}
+      {/* Bug Report Modal — controlled by toolbar icon */}
       <Suspense fallback={null}>
-        <BugReportButton />
+        <BugReportButton externalOpen={bugReportOpen} onExternalClose={() => setBugReportOpen(false)} />
       </Suspense>
+
+      {/* Export Modal */}
+      {exportOpen && (
+        <ExportModal
+          tasks={store.tasks}
+          projectName={projectName || ''}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
 
       {/* Auto-save toast */}
       {autoSaveToast && (
         <div
-          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
+          className="fixed bottom-24 right-6 z-50 flex items-center gap-2 rounded-lg border border-border bg-sidebar px-3 py-2 shadow-lg"
           style={{
             animation: autoSaveToast === 'in'
               ? 'fantt-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
@@ -1334,6 +1431,31 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
           <span className="text-xs text-text-muted">Auto-saved</span>
         </div>
       )}
+
+      {/* FAB — Add Task */}
+      <button
+        onClick={handleOpenAdd}
+        className="group/fab fixed bottom-6 right-6 z-30 flex items-center overflow-hidden rounded-full bg-accent text-white shadow-lg shadow-accent/25 transition-all duration-300 ease-out hover:shadow-accent/50 hover:shadow-xl active:scale-95"
+        title="Add Task"
+      >
+        {/* Label slides out to the left on hover */}
+        <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-out group-hover/fab:max-w-[96px]">
+          <span className="block pl-5 pr-1 text-sm font-semibold tracking-tight">Add task</span>
+        </span>
+        {/* Icon rotates on hover */}
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center transition-transform duration-500 ease-out group-hover/fab:rotate-90">
+          <Plus size={22} />
+        </span>
+      </button>
+
+      {/* Bottom-center branding */}
+      <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 pointer-events-none select-none">
+        <FanttLogo size={8} color="rgba(255,255,255,0.18)" />
+        <span className="text-[8px] font-light tracking-wide" style={{ color: 'rgba(255,255,255,0.18)' }}>
+          Fantt Chart · Made by Fantasy
+        </span>
+      </div>
+
     </div>
   );
 }
