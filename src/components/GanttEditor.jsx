@@ -712,15 +712,45 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
             </div>
           )}
 
-          {/* Right: spinning Fantasy shield */}
-          <div
-            className="ml-auto select-none pointer-events-none"
-            style={{
-              transform: `rotate(${logoRot}deg)`,
-              transition: 'transform 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-            }}
-          >
-            <FanttLogo size={14} color="rgba(255,255,255,0.35)" />
+          {/* Right: Fantasy shield + user profile avatar */}
+          <div className="ml-auto flex items-center gap-2.5">
+            <div
+              className="select-none pointer-events-none"
+              style={{
+                transform: `rotate(${logoRot}deg)`,
+                transition: 'transform 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+              }}
+            >
+              <FanttLogo size={14} color="rgba(255,255,255,0.35)" />
+            </div>
+
+            {/* User profile avatar — display only, no click behavior yet */}
+            {email && (() => {
+              try {
+                const local = email.includes('@') ? email.split('@')[0] : email;
+                const parts = local.split(/[.\-_\s]+/).filter(Boolean);
+                const initials = parts.length >= 2
+                  ? (parts[0][0] + parts[1][0]).toUpperCase()
+                  : parts[0]?.[0]?.toUpperCase() || '?';
+                return (
+                  <div
+                    title={email}
+                    style={{
+                      width: 26, height: 26,
+                      borderRadius: '50%',
+                      background: 'var(--color-accent)',
+                      color: '#fff',
+                      fontSize: 9, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid var(--color-bg)',
+                      cursor: 'default', flexShrink: 0,
+                    }}
+                  >
+                    {initials}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
           </div>
         </div>
 
@@ -797,46 +827,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
 
             {/* Avatar, Add task, Library, Share, Collaborators — grouped with left tools */}
             <div className="flex items-center gap-1">
-              {/* You avatar */}
-              {email && (() => {
-                try {
-                  const local = email.includes('@') ? email.split('@')[0] : email;
-                  const parts = local.split(/[.\-_\s]+/).filter(Boolean);
-                  const initials = parts.length >= 2
-                    ? (parts[0][0] + parts[1][0]).toUpperCase()
-                    : parts[0]?.[0]?.toUpperCase() || '?';
-                  const savedLabel = store.saveStatus === 'saving'
-                    ? 'Saving…'
-                    : store.lastSavedAt
-                      ? `Saved ${store.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : null;
-                  const tooltip = [email, savedLabel].filter(Boolean).join(' · ');
-                  return (
-                    <div
-                      title={tooltip}
-                      className={store.saveStatus === 'saving' ? 'animate-pulse' : ''}
-                      style={{
-                        width: 24, height: 24,
-                        borderRadius: '50%',
-                        background: 'var(--color-accent)',
-                        color: '#fff',
-                        fontSize: 9, fontWeight: 700,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '2px solid var(--color-bg)',
-                        outline: store.saveStatus === 'saving' ? '2px solid var(--color-accent)' : 'none',
-                        outlineOffset: '2px',
-                        cursor: 'default', flexShrink: 0,
-                        marginRight: 4,
-                      }}
-                    >
-                      {initials}
-                    </div>
-                  );
-                } catch { return null; }
-              })()}
-
-              <div className="h-4 w-px bg-border/60 mx-0.5" />
-
               {/* Add Task CTA */}
               <button
                 onClick={handleOpenAdd}
