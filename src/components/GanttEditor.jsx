@@ -1413,7 +1413,6 @@ export default function GanttEditor({ projectId, projectName, email, onBack, isC
         <ExportModal
           tasks={store.tasks}
           projectName={projectName || ''}
-          projectId={projectId}
           onClose={() => setExportOpen(false)}
         />
       )}
